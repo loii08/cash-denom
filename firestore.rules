@@ -74,14 +74,16 @@ service cloud.firestore {
     // ===============================================================
 
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() && (isDocOwner() || isAdmin());
+      allow read: if isAuthenticated() && request.query.where[0].value == request.auth.uid;
+      allow list: if isAuthenticated();
       allow create: if isAuthenticated() && isValidTransaction(request.resource.data) && uidUnchanged();
       allow update: if isAuthenticated() && isValidTransaction(request.resource.data) && (isDocOwner() || isAdmin()) && request.resource.data.uid == resource.data.uid;
       allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
     }
 
     match /activityLogs/{logId} {
-      allow read: if isAuthenticated() && (isDocOwner() || isAdmin());
+      allow read: if isAuthenticated() && request.query.where[0].value == request.auth.uid;
+      allow list: if isAuthenticated();
       allow create: if isAuthenticated() && isValidActivityLog(request.resource.data) && uidUnchanged();
       allow update, delete: if false; // Logs should be immutable
     }
