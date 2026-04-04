@@ -301,19 +301,10 @@ export default function App() {
     const path = 'transactions';
     const constraints = [where('uid', '==', user.uid)];
 
-    if (selectedDate) {
-      const start = new Date(selectedDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(selectedDate);
-      end.setHours(23, 59, 59, 999);
-      constraints.push(where('date', '>=', start));
-      constraints.push(where('date', '<=', end));
-    }
-
     const q = query(collection(db, path), ...constraints);
 
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
-      const txs: Transaction[] = snapshot.docs.map(doc => {
+      let txs: Transaction[] = snapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
@@ -324,6 +315,16 @@ export default function App() {
           hasPendingWrites: doc.metadata.hasPendingWrites
         };
       });
+      
+      // Apply client-side date filtering
+      if (selectedDate) {
+        const start = new Date(selectedDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(selectedDate);
+        end.setHours(23, 59, 59, 999);
+        txs = txs.filter(tx => tx.date >= start && tx.date <= end);
+      }
+      
       // Sort by date descending (newest first)
       txs.sort((a, b) => b.date.getTime() - a.date.getTime());
       setTransactions(txs);
