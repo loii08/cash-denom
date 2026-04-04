@@ -886,10 +886,6 @@ export default function App() {
                       </button>
                     )}
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-neutral-400 uppercase font-bold tracking-widest">Subtotal</p>
-                    <p className="text-xl font-bold text-emerald-600">₱ {currentTotal.toLocaleString()}</p>
-                  </div>
                 </div>
                 <div className="p-6 space-y-4">
                   {DENOMINATIONS.map((d) => (
@@ -905,6 +901,7 @@ export default function App() {
                             if (e.key === 'Enter') handleSave();
                             if (e.key === 'Escape') cancelEditing();
                           }}
+                          onWheel={(e) => e.currentTarget.blur()}
                           placeholder="0"
                           max="99999"
                           className={`flex-1 bg-neutral-100 border-2 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 transition-all text-neutral-900 font-medium ${
