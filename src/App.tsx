@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   collection, 
   addDoc, 
@@ -42,9 +42,69 @@ import {
   WifiOff,
   CloudOff,
   Cloud,
-  RefreshCcw
+  RefreshCcw,
+  AlertCircle,
+  Bell,
+  Eye,
+  EyeOff,
+  Copy,
+  BarChart3
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+// --- Toast Notification System ---
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info' | 'warning';
+  duration?: number;
+}
+
+const Toast = ({ toast, onRemove }: { toast: Toast; onRemove: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onRemove, toast.duration || 4000);
+    return () => clearTimeout(timer);
+  }, [toast.duration, onRemove]);
+
+  const bgColor = {
+    success: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+    error: 'bg-red-50 border-red-200 text-red-900',
+    info: 'bg-blue-50 border-blue-200 text-blue-900',
+    warning: 'bg-amber-50 border-amber-200 text-amber-900'
+  }[toast.type];
+
+  const icon = {
+    success: <Check className="w-4 h-4" />,
+    error: <AlertCircle className="w-4 h-4" />,
+    info: <AlertCircle className="w-4 h-4" />,
+    warning: <AlertCircle className="w-4 h-4" />
+  }[toast.type];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${bgColor} text-sm font-medium`}
+    >
+      {icon}
+      <span className="flex-1">{toast.message}</span>
+      <button onClick={onRemove} className="opacity-50 hover:opacity-100">
+        <X className="w-4 h-4" />
+      </button>
+    </motion.div>
+  );
+};
+
+// --- Input Validation ---
+const validateDenomination = (value: string): boolean => {
+  const num = parseInt(value);
+  return !isNaN(num) && num >= 0 && num <= 99999;
+};
+
+const sanitizeInput = (value: string): string => {
+  return value.replace(/[^0-9]/g, '');
+};
 
 // --- Error Handling ---
 enum OperationType {
@@ -119,8 +179,20 @@ export default function App() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [inputErrors, setInputErrors] = useState<Record<number, string>>({});
+  const lastSaveTimeRef = useRef<number>(0);
+  const [showStats, setShowStats] = useState(false);
 
-  // Online/Offline Listener
+  // --- Toast Helper ---
+  const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+    const id = Date.now().toString();
+    setToasts(prev => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -272,8 +344,32 @@ export default function App() {
     return transactions.reduce((acc, tx) => acc + tx.total, 0);
   }, [transactions]);
 
+  const stats = useMemo(() => {
+    if (transactions.length === 0) return { avg: 0, max: 0, min: 0, count: 0 };
+    const totals = transactions.map(t => t.total);
+    return {
+      avg: Math.round(totals.reduce((a, b) => a + b, 0) / totals.length),
+      max: Math.max(...totals),
+      min: Math.min(...totals),
+      count: transactions.length
+    };
+  }, [transactions]);
+
   const handleQuantityChange = (denom: number, value: string) => {
-    const qty = parseInt(value) || 0;
+    const sanitized = sanitizeInput(value);
+    const qty = parseInt(sanitized) || 0;
+    
+    if (!validateDenomination(sanitized)) {
+      setInputErrors(prev => ({ ...prev, [denom]: 'Invalid amount' }));
+      return;
+    }
+    
+    setInputErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[denom];
+      return newErrors;
+    });
+    
     setQuantities(prev => ({ ...prev, [denom]: Math.max(0, qty) }));
   };
 
@@ -294,7 +390,18 @@ export default function App() {
 
   const handleSave = async () => {
     if (!user) return;
-    if (currentTotal === 0) return;
+    if (currentTotal === 0) {
+      addToast('Please enter at least one denomination', 'warning');
+      return;
+    }
+
+    // Rate limiting - prevent rapid saves
+    const now = Date.now();
+    if (now - lastSaveTimeRef.current < 1000) {
+      addToast('Please wait a moment before saving again', 'warning');
+      return;
+    }
+    lastSaveTimeRef.current = now;
 
     setIsSaving(true);
     const path = 'transactions';
@@ -311,6 +418,7 @@ export default function App() {
           breakdown: quantities 
         });
         setEditingId(null);
+        addToast('Transaction updated successfully', 'success');
       } else {
         const docRef = await addDoc(collection(db, path), {
           date: Timestamp.now(),
@@ -323,11 +431,13 @@ export default function App() {
           total: currentTotal, 
           breakdown: quantities 
         });
+        addToast(`Saved ₱${currentTotal.toLocaleString()}`, 'success');
       }
       // Reset quantities after save
       setQuantities(DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: 0 }), {}));
       setActiveTab('history');
     } catch (error) {
+      addToast(editingId ? 'Failed to update transaction' : 'Failed to save transaction', 'error');
       handleFirestoreError(error, editingId ? OperationType.UPDATE : OperationType.CREATE, path);
     } finally {
       setIsSaving(false);
@@ -348,7 +458,9 @@ export default function App() {
         originalDate: txToDelete.date
       });
       setTxToDelete(null);
+      addToast('Transaction deleted', 'success');
     } catch (error) {
+      addToast('Failed to delete transaction', 'error');
       handleFirestoreError(error, OperationType.DELETE, path);
     } finally {
       setIsDeleting(false);
@@ -373,20 +485,25 @@ export default function App() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      addToast('Signed in successfully', 'success');
     } catch (error) {
       if (error instanceof Error) {
         if (error.message.includes('auth/cancelled-popup-request')) {
           console.warn("Login popup request was cancelled or another one is pending.");
         } else if (error.message.includes('auth/unauthorized-domain')) {
           setLoginError("This domain is not authorized for Google Sign-In. Please add the current URL to your Firebase Console's Authorized Domains.");
+          addToast('Domain not authorized for Google Sign-In', 'error');
         } else if (error.message.includes('auth/popup-blocked')) {
           setLoginError("The login popup was blocked by your browser. Please allow popups for this site or open the app in a new tab.");
+          addToast('Popup blocked - please allow popups', 'error');
         } else {
           setLoginError(`Login Error: ${error.message}`);
+          addToast('Login failed', 'error');
           console.error("Login Error:", error);
         }
       } else {
         setLoginError("An unknown error occurred during login.");
+        addToast('Login failed', 'error');
       }
     } finally {
       setIsLoggingIn(false);
@@ -544,59 +661,72 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-neutral-100 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-neutral-100 flex flex-col items-center justify-center p-4">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center"
+          className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-6"
         >
-          <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="w-20 h-20 bg-gradient-to-br from-emerald-100 to-emerald-50 rounded-full flex items-center justify-center mx-auto shadow-lg">
             <Wallet className="w-10 h-10 text-emerald-600" />
           </div>
-          <h1 className="text-3xl font-bold text-neutral-900 mb-2">Cash Tracker</h1>
-          <p className="text-neutral-500 mb-8">Track your physical savings with ease. Count your bills and coins in one place.</p>
+          <div>
+            <h1 className="text-4xl font-bold text-neutral-900 mb-2">Cash Tracker</h1>
+            <p className="text-neutral-500 text-lg">Track your physical savings with ease.</p>
+          </div>
           
           {connectionError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm flex flex-col gap-3">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm space-y-3"
+            >
               <div className="flex items-center gap-3">
-                <X className="w-5 h-5 flex-shrink-0" />
-                <p className="text-left font-medium">{connectionError}</p>
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <p className="font-medium text-left">{connectionError}</p>
               </div>
               <button 
                 onClick={() => window.location.reload()}
-                className="text-xs bg-red-100 hover:bg-red-200 py-2 px-3 rounded-xl transition-colors font-bold"
+                className="w-full text-xs bg-red-100 hover:bg-red-200 py-2 px-3 rounded-xl transition-colors font-bold"
               >
                 Retry Connection
               </button>
-            </div>
+            </motion.div>
           )}
 
           {loginError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm flex flex-col gap-3">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm space-y-3"
+            >
               <div className="flex items-center gap-3">
-                <X className="w-5 h-5 flex-shrink-0" />
-                <p className="text-left font-medium">{loginError}</p>
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <p className="font-medium text-left">{loginError}</p>
               </div>
               <button 
                 onClick={() => window.open(window.location.href, '_blank')}
-                className="text-xs bg-red-100 hover:bg-red-200 py-2 px-3 rounded-xl transition-colors font-bold"
+                className="w-full text-xs bg-red-100 hover:bg-red-200 py-2 px-3 rounded-xl transition-colors font-bold"
               >
                 Try Opening in New Tab
               </button>
-            </div>
+            </motion.div>
           )}
 
           <button 
             onClick={handleLogin}
             disabled={isLoggingIn}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-300 text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-emerald-100"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-300 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-emerald-200"
           >
             {isLoggingIn ? (
-              <motion.div 
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
-              />
+              <>
+                <motion.div 
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                  className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                />
+                Signing in...
+              </>
             ) : (
               <>
                 <LogIn className="w-5 h-5" />
@@ -604,6 +734,12 @@ export default function App() {
               </>
             )}
           </button>
+
+          <div className="pt-4 border-t border-neutral-200">
+            <p className="text-xs text-neutral-500">
+              By signing in, you agree to our terms. Your data is encrypted and private.
+            </p>
+          </div>
         </motion.div>
       </div>
     );
@@ -611,8 +747,22 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-100 pb-20">
+      {/* Toast Container */}
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">
+        <AnimatePresence>
+          {toasts.map((toast) => (
+            <div key={toast.id} className="pointer-events-auto">
+              <Toast 
+                toast={toast} 
+                onRemove={() => removeToast(toast.id)} 
+              />
+            </div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       {/* Header */}
-      <header className="bg-white border-b border-neutral-200 sticky top-0 z-10">
+      <header className="bg-white border-b border-neutral-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wallet className="w-6 h-6 text-emerald-600" />
@@ -628,6 +778,7 @@ export default function App() {
             <button 
               onClick={handleLogout}
               className="p-2 text-neutral-400 hover:text-neutral-600 rounded-lg hover:bg-neutral-100 transition-colors"
+              title="Sign out"
             >
               <LogOut className="w-5 h-5" />
             </button>
@@ -637,18 +788,51 @@ export default function App() {
 
       <main className="max-w-2xl mx-auto p-4 space-y-6">
         <DeleteModal />
-        {/* Total Savings Banner */}
+        
+        {/* Total Savings Banner with Stats */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-emerald-600 p-8 rounded-3xl text-white shadow-lg shadow-emerald-200 relative overflow-hidden"
+          className="bg-emerald-600 p-8 rounded-3xl text-white shadow-lg shadow-emerald-200 relative overflow-hidden cursor-pointer hover:shadow-xl transition-shadow"
+          onClick={() => setShowStats(!showStats)}
         >
           <div className="relative z-10">
-            <p className="text-emerald-100 text-sm font-medium uppercase tracking-wider mb-1">Total Savings</p>
-            <h2 className="text-5xl font-bold flex items-baseline gap-1">
+            <p className="text-emerald-100 text-sm font-medium uppercase tracking-wider mb-1 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Total Savings
+            </p>
+            <h2 className="text-5xl font-bold flex items-baseline gap-1 mb-4">
               <span className="text-3xl font-medium opacity-80">₱</span>
               {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h2>
+            
+            <AnimatePresence>
+              {showStats && stats.count > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="grid grid-cols-4 gap-3 pt-4 border-t border-emerald-400"
+                >
+                  <div className="text-center">
+                    <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Entries</p>
+                    <p className="text-xl font-bold">{stats.count}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Average</p>
+                    <p className="text-xl font-bold">₱{stats.avg.toLocaleString()}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Max</p>
+                    <p className="text-xl font-bold">₱{stats.max.toLocaleString()}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Min</p>
+                    <p className="text-xl font-bold">₱{stats.min.toLocaleString()}</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           <div className="absolute -right-10 -bottom-10 opacity-10">
             <PhilippinePeso className="w-48 h-48" />
@@ -709,29 +893,51 @@ export default function App() {
                 </div>
                 <div className="p-6 space-y-4">
                   {DENOMINATIONS.map((d) => (
-                    <div key={d} className="flex items-center gap-4">
-                      <div className="w-20 font-bold text-neutral-700">₱ {d}</div>
-                      <div className="flex-1">
+                    <div key={d} className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="w-20 font-bold text-neutral-700">₱ {d}</label>
+                        <div className="text-xs text-neutral-400">Subtotal: ₱{(d * (quantities[d] || 0)).toLocaleString()}</div>
+                      </div>
+                      <div className="flex items-center gap-3">
                         <input 
                           type="number" 
                           inputMode="numeric"
                           value={quantities[d] || ''}
                           onChange={(e) => handleQuantityChange(d, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSave();
+                            if (e.key === 'Escape') cancelEditing();
+                          }}
                           placeholder="0"
-                          className="w-full bg-neutral-100 border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 transition-all text-neutral-900 font-medium"
+                          max="99999"
+                          className={`flex-1 bg-neutral-100 border-2 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 transition-all text-neutral-900 font-medium ${
+                            inputErrors[d] ? 'border-red-300' : 'border-transparent'
+                          }`}
                         />
+                        <div className="w-28 text-right font-mono text-neutral-500 text-sm">
+                          {(d * (quantities[d] || 0)).toLocaleString()}
+                        </div>
                       </div>
-                      <div className="w-24 text-right font-mono text-neutral-400 text-sm">
-                        ₱ {(d * (quantities[d] || 0)).toLocaleString()}
-                      </div>
+                      {inputErrors[d] && (
+                        <p className="text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {inputErrors[d]}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
-                <div className="p-6 bg-neutral-50 border-t border-neutral-100">
+                <div className="p-6 bg-neutral-50 border-t border-neutral-100 space-y-3">
+                  {currentTotal > 0 && (
+                    <div className="flex items-center justify-between px-4 py-2 bg-white rounded-xl border border-neutral-200">
+                      <span className="text-sm font-medium text-neutral-600">Total:</span>
+                      <span className="text-lg font-bold text-emerald-600">₱ {currentTotal.toLocaleString()}</span>
+                    </div>
+                  )}
                   <button 
                     onClick={handleSave}
                     disabled={isSaving || currentTotal === 0}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-300 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-emerald-100"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-emerald-100"
                   >
                     {isSaving ? (
                       <motion.div 
@@ -742,8 +948,17 @@ export default function App() {
                     ) : (
                       editingId ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />
                     )}
-                    {editingId ? 'Update Transaction' : 'Save Transaction'}
+                    {isSaving ? 'Saving...' : (editingId ? 'Update Transaction' : 'Save Transaction')}
                   </button>
+                  {editingId && (
+                    <button 
+                      onClick={cancelEditing}
+                      disabled={isSaving}
+                      className="w-full py-3 text-neutral-600 hover:text-neutral-700 font-bold rounded-xl hover:bg-neutral-200 transition-colors"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -758,13 +973,25 @@ export default function App() {
               <CalendarPicker />
 
               {transactions.length === 0 ? (
-                <div className="bg-white p-12 rounded-3xl text-center border border-neutral-200 border-dashed">
-                  <History className="w-12 h-12 text-neutral-200 mx-auto mb-4" />
-                  <p className="text-neutral-400">
-                    {selectedDate 
-                      ? `No transactions on ${selectedDate.toLocaleDateString()}.` 
-                      : 'No transactions yet.'}
-                  </p>
+                <div className="bg-white p-12 rounded-3xl text-center border border-neutral-200 border-dashed space-y-4">
+                  <div className="w-16 h-16 bg-neutral-100 rounded-2xl flex items-center justify-center mx-auto">
+                    <History className="w-8 h-8 text-neutral-300" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-neutral-700 mb-1">No transactions yet</p>
+                    <p className="text-sm text-neutral-400">
+                      {selectedDate 
+                        ? `No transactions on ${selectedDate.toLocaleDateString()}.` 
+                        : 'Start by creating your first transaction'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { setActiveTab('new'); setSelectedDate(null); }}
+                    className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-bold text-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create First Entry
+                  </button>
                 </div>
               ) : (
                 transactions.map((tx) => (
@@ -847,9 +1074,14 @@ export default function App() {
               className="space-y-3"
             >
               {activityLogs.length === 0 ? (
-                <div className="bg-white p-12 rounded-3xl text-center border border-neutral-200 border-dashed">
-                  <Activity className="w-12 h-12 text-neutral-200 mx-auto mb-4" />
-                  <p className="text-neutral-400">No activity logs yet.</p>
+                <div className="bg-white p-12 rounded-3xl text-center border border-neutral-200 border-dashed space-y-4">
+                  <div className="w-16 h-16 bg-neutral-100 rounded-2xl flex items-center justify-center mx-auto">
+                    <Activity className="w-8 h-8 text-neutral-300" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-neutral-700 mb-1">No activity yet</p>
+                    <p className="text-sm text-neutral-400">Your actions will be logged here</p>
+                  </div>
                 </div>
               ) : (
                 activityLogs.map((log) => (
