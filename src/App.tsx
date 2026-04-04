@@ -359,7 +359,8 @@ export default function App() {
     const sanitized = sanitizeInput(value);
     const qty = parseInt(sanitized) || 0;
     
-    if (!validateDenomination(sanitized)) {
+    // Only show error if value is not empty and invalid
+    if (sanitized && !validateDenomination(sanitized)) {
       setInputErrors(prev => ({ ...prev, [denom]: 'Invalid amount' }));
       return;
     }
@@ -941,6 +942,16 @@ export default function App() {
                       editingId ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />
                     )}
                     {isSaving ? 'Saving...' : (editingId ? 'Update Transaction' : 'Save Transaction')}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setQuantities(DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: 0 }), {}));
+                      setInputErrors({});
+                    }}
+                    disabled={isSaving || currentTotal === 0}
+                    className="w-full py-3 text-neutral-600 hover:text-neutral-700 hover:bg-neutral-200 disabled:text-neutral-400 disabled:cursor-not-allowed font-bold rounded-xl transition-colors"
+                  >
+                    Clear All
                   </button>
                   {editingId && (
                     <button 
