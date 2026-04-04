@@ -894,10 +894,7 @@ export default function App() {
                 <div className="p-6 space-y-4">
                   {DENOMINATIONS.map((d) => (
                     <div key={d} className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="w-20 font-bold text-neutral-700">₱ {d}</label>
-                        <div className="text-xs text-neutral-400">Subtotal: ₱{(d * (quantities[d] || 0)).toLocaleString()}</div>
-                      </div>
+                      <label className="block font-bold text-neutral-700">₱ {d}</label>
                       <div className="flex items-center gap-3">
                         <input 
                           type="number" 
@@ -914,7 +911,7 @@ export default function App() {
                             inputErrors[d] ? 'border-red-300' : 'border-transparent'
                           }`}
                         />
-                        <div className="w-28 text-right font-mono text-neutral-500 text-sm">
+                        <div className="w-24 text-right font-mono text-neutral-500 text-sm font-semibold">
                           {(d * (quantities[d] || 0)).toLocaleString()}
                         </div>
                       </div>
@@ -928,12 +925,10 @@ export default function App() {
                   ))}
                 </div>
                 <div className="p-6 bg-neutral-50 border-t border-neutral-100 space-y-3">
-                  {currentTotal > 0 && (
-                    <div className="flex items-center justify-between px-4 py-2 bg-white rounded-xl border border-neutral-200">
-                      <span className="text-sm font-medium text-neutral-600">Total:</span>
-                      <span className="text-lg font-bold text-emerald-600">₱ {currentTotal.toLocaleString()}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center justify-between px-4 py-3 bg-emerald-50 rounded-xl border-2 border-emerald-200">
+                    <span className="text-sm font-bold text-emerald-900">Total Amount:</span>
+                    <span className="text-2xl font-bold text-emerald-600">₱ {currentTotal.toLocaleString()}</span>
+                  </div>
                   <button 
                     onClick={handleSave}
                     disabled={isSaving || currentTotal === 0}
