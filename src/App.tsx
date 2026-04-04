@@ -890,8 +890,8 @@ export default function App() {
                 <div className="p-6 space-y-4">
                   {DENOMINATIONS.map((d) => (
                     <div key={d} className="space-y-1.5">
-                      <label className="block font-bold text-neutral-700">₱ {d}</label>
                       <div className="flex items-center gap-3">
+                        <label className="font-bold text-neutral-700 w-16">₱ {d}</label>
                         <input 
                           type="number" 
                           inputMode="numeric"
