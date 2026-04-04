@@ -1231,6 +1231,7 @@ export default function App() {
                               <RefreshCcw className="w-3 h-3 text-emerald-500 animate-spin" />
                             )}
                           </p>
+                          <p className="text-xs text-neutral-500">by: {user?.displayName || 'User'}</p>
                           <p className="text-xs text-neutral-400">
                             {log.timestamp.toLocaleDateString()} at {log.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
