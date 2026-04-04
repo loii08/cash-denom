@@ -183,6 +183,8 @@ export default function App() {
   const [inputErrors, setInputErrors] = useState<Record<number, string>>({});
   const lastSaveTimeRef = useRef<number>(0);
   const [showStats, setShowStats] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
   // --- Toast Helper ---
   const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
@@ -205,6 +207,37 @@ export default function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Install Prompt Handler
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallPrompt(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        addToast('App installed successfully!', 'success');
+      }
+      setDeferredPrompt(null);
+      setShowInstallPrompt(false);
+    }
+  };
+
+  const dismissInstallPrompt = () => {
+    setShowInstallPrompt(false);
+  };
 
   // Auth Listener
   useEffect(() => {
@@ -775,6 +808,16 @@ export default function App() {
                 <WifiOff className="w-3 h-3" />
                 Offline
               </div>
+            )}
+            {showInstallPrompt && (
+              <button 
+                onClick={handleInstall}
+                className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold border border-emerald-200 hover:bg-emerald-100 transition-colors flex items-center gap-1.5"
+                title="Install Cash Tracker app"
+              >
+                <Plus className="w-3 h-3" />
+                Install
+              </button>
             )}
             <button 
               onClick={handleLogout}

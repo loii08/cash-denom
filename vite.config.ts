@@ -13,22 +13,78 @@ export default defineConfig(({mode}) => {
       VitePWA({
         registerType: 'autoUpdate',
         manifest: {
-          name: 'Cash Tracker',
-          short_name: 'CashTracker',
-          description: 'Track your physical savings with ease.',
+          name: 'Cash Denomination Tracker',
+          short_name: 'Cash Tracker',
+          description: 'Track your physical cash savings with denominations breakdown.',
           theme_color: '#059669',
           background_color: '#ffffff',
           display: 'standalone',
+          scope: '/',
+          start_url: '/',
+          orientation: 'portrait-primary',
           icons: [
             {
               src: '/icon-192.svg',
               sizes: '192x192',
-              type: 'image/svg+xml'
+              type: 'image/svg+xml',
+              purpose: 'any'
             },
             {
               src: '/icon-512.svg',
               sizes: '512x512',
-              type: 'image/svg+xml'
+              type: 'image/svg+xml',
+              purpose: 'any'
+            }
+          ],
+          screenshots: [
+            {
+              src: '/icon-192.svg',
+              sizes: '192x192',
+              type: 'image/svg+xml',
+              form_factor: 'narrow'
+            }
+          ],
+          categories: ['finance', 'productivity'],
+          shortcuts: [
+            {
+              name: 'New Transaction',
+              short_name: 'New',
+              description: 'Create a new cash transaction',
+              url: '/?action=new',
+              icons: [
+                {
+                  src: '/icon-192.svg',
+                  sizes: '192x192',
+                  type: 'image/svg+xml'
+                }
+              ]
+            }
+          ]
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'google-fonts-cache',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                }
+              }
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'gstatic-fonts-cache',
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                }
+              }
             }
           ]
         }
