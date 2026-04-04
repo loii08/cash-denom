@@ -874,7 +874,7 @@ export default function App() {
               className="space-y-4"
             >
               <div className="bg-white rounded-3xl shadow-sm border border-neutral-200 overflow-hidden">
-                <div className="p-6 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/50 sticky top-[72px] z-10 backdrop-blur-md">
+                <div className="p-6 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/50 sticky top-[72px] z-10 backdrop-blur-md h-auto">
                   <div className="flex items-center gap-3">
                     <h3 className="font-bold text-neutral-900">{editingId ? 'Edit Transaction' : 'Denominations'}</h3>
                     {editingId && (
@@ -885,6 +885,10 @@ export default function App() {
                         <X className="w-3 h-3" /> Cancel
                       </button>
                     )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-neutral-400 uppercase font-bold tracking-widest">Subtotal</p>
+                    <p className="text-xl font-bold text-emerald-600">₱ {currentTotal.toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="p-6 space-y-4">
@@ -922,10 +926,6 @@ export default function App() {
                   ))}
                 </div>
                 <div className="p-6 bg-neutral-50 border-t border-neutral-100 space-y-3">
-                  <div className="flex items-center justify-between px-4 py-3 bg-emerald-50 rounded-xl border-2 border-emerald-200">
-                    <span className="text-sm font-bold text-emerald-900">Total Amount:</span>
-                    <span className="text-2xl font-bold text-emerald-600">₱ {currentTotal.toLocaleString()}</span>
-                  </div>
                   <button 
                     onClick={handleSave}
                     disabled={isSaving || currentTotal === 0}
