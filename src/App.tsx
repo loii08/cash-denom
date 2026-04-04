@@ -918,9 +918,9 @@ export default function App() {
               className="space-y-4"
             >
               <div className="bg-white rounded-3xl shadow-sm border border-neutral-200 overflow-hidden flex flex-col">
-                <div className="p-6 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/50 backdrop-blur-md">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-bold text-neutral-900">{editingId ? 'Edit Transaction' : 'Denominations'}</h3>
+                <div className="p-4 sm:p-6 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/50 backdrop-blur-md">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <h3 className="font-bold text-neutral-900 text-base sm:text-lg">{editingId ? 'Edit Transaction' : 'Denominations'}</h3>
                     {editingId && (
                       <button 
                         onClick={cancelEditing}
@@ -932,14 +932,14 @@ export default function App() {
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-neutral-400 uppercase font-bold tracking-widest">Subtotal</p>
-                    <p className="text-xl font-bold text-emerald-600">₱ {currentTotal.toLocaleString()}</p>
+                    <p className="text-lg sm:text-xl font-bold text-emerald-600">₱ {currentTotal.toLocaleString()}</p>
                   </div>
                 </div>
-                <div className="p-6 space-y-3 overflow-y-auto">
+                <div className="p-4 sm:p-6 space-y-3 overflow-y-auto">
                   {DENOMINATIONS.map((d) => (
                     <div key={d} className="space-y-0">
-                      <div className="flex items-center gap-3">
-                        <label className="font-bold text-neutral-700 w-16">₱ {d}</label>
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <label className="font-bold text-neutral-700 w-14 sm:w-16 text-sm sm:text-base">₱ {d}</label>
                         <input 
                           type="number" 
                           inputMode="numeric"
@@ -952,11 +952,11 @@ export default function App() {
                           onWheel={(e) => e.currentTarget.blur()}
                           placeholder="0"
                           max="99999"
-                          className={`flex-1 bg-neutral-100 border-2 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 transition-all text-neutral-900 font-medium ${
+                          className={`flex-1 min-w-0 bg-neutral-100 border-2 rounded-xl px-3 py-2 sm:px-4 sm:py-3 focus:ring-2 focus:ring-emerald-500 transition-all text-neutral-900 font-medium text-sm sm:text-base ${
                             inputErrors[d] ? 'border-red-300' : 'border-transparent'
                           }`}
                         />
-                        <div className="w-24 text-right font-mono text-neutral-500 text-sm font-semibold">
+                        <div className="w-16 sm:w-24 text-right font-mono text-neutral-500 text-xs sm:text-sm font-semibold truncate">
                           {(d * (quantities[d] || 0)).toLocaleString()}
                         </div>
                       </div>
@@ -969,7 +969,7 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <div className="p-6 bg-neutral-50 border-t border-neutral-100 space-y-3">
+                <div className="p-4 sm:p-6 bg-neutral-50 border-t border-neutral-100 space-y-3">
                   <button 
                     onClick={handleSave}
                     disabled={isSaving || currentTotal === 0}
