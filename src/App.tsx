@@ -891,9 +891,9 @@ export default function App() {
                     <p className="text-xl font-bold text-emerald-600">₱ {currentTotal.toLocaleString()}</p>
                   </div>
                 </div>
-                <div className="p-6 space-y-4">
+                <div className="p-6 pt-4 space-y-4">
                   {DENOMINATIONS.map((d) => (
-                    <div key={d} className="space-y-1.5">
+                    <div key={d} className="space-y-0">
                       <div className="flex items-center gap-3">
                         <label className="font-bold text-neutral-700 w-16">₱ {d}</label>
                         <input 
