@@ -185,6 +185,7 @@ export default function App() {
   const [showStats, setShowStats] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
 
   // --- Toast Helper ---
   const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
@@ -640,6 +641,66 @@ export default function App() {
     );
   };
 
+  const UserProfile = () => {
+    if (!showUserProfile || !user) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl"
+        >
+          <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 p-6 text-white">
+            <button 
+              onClick={() => setShowUserProfile(false)}
+              className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-4">
+              {user.photoURL ? (
+                <img src={user.photoURL} alt="Profile" className="w-16 h-16 rounded-full border-4 border-white" />
+              ) : (
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                  <Wallet className="w-8 h-8" />
+                </div>
+              )}
+              <div className="text-left">
+                <h3 className="text-xl font-bold">{user.displayName || 'User'}</h3>
+                <p className="text-emerald-100 text-sm">{user.email}</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="space-y-2">
+              <p className="text-xs uppercase font-bold text-neutral-400 tracking-widest">Account Info</p>
+              <div className="bg-neutral-50 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-xs text-neutral-400 mb-1">Name</p>
+                  <p className="font-semibold text-neutral-900">{user.displayName || 'Not set'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-400 mb-1">Email</p>
+                  <p className="font-semibold text-neutral-900">{user.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-400 mb-1">User ID</p>
+                  <p className="font-mono text-xs text-neutral-600 break-all">{user.uid}</p>
+                </div>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowUserProfile(false)}
+              className="w-full py-3 font-bold text-neutral-900 hover:bg-neutral-100 rounded-xl transition-all"
+            >
+              Close
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  };
+
   const DeleteModal = () => {
     if (!txToDelete) return null;
     return (
@@ -821,6 +882,17 @@ export default function App() {
               </button>
             )}
             <button 
+              onClick={() => setShowUserProfile(!showUserProfile)}
+              className="p-2 text-neutral-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors"
+              title="User profile"
+            >
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="Profile" className="w-5 h-5 rounded-full" />
+              ) : (
+                <Wallet className="w-5 h-5" />
+              )}
+            </button>
+            <button 
               onClick={handleLogout}
               className="p-2 text-neutral-400 hover:text-neutral-600 rounded-lg hover:bg-neutral-100 transition-colors"
               title="Sign out"
@@ -833,6 +905,7 @@ export default function App() {
 
       <main className="max-w-2xl mx-auto p-4 space-y-6">
         <DeleteModal />
+        <UserProfile />
         
         {/* Total Savings Banner with Stats */}
         <motion.div 
@@ -1062,7 +1135,8 @@ export default function App() {
                                 <RefreshCcw className="w-3 h-3 text-emerald-500 animate-spin" />
                               )}
                             </p>
-                            <p className="text-xs text-neutral-400">{tx.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                            <p className="text-xs text-neutral-500">by: {user?.displayName || 'User'}</p>
+                            <p className="text-xs text-neutral-400">{tx.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {tx.date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
                           </div>
                         </div>
                         {expandedId === tx.id ? <ChevronDown className="w-5 h-5 text-neutral-300" /> : <ChevronRight className="w-5 h-5 text-neutral-300" />}
