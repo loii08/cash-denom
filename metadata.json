@@ -1,0 +1,5 @@
+{
+  "name": "Cash Denom Tracker",
+  "description": "Track and save physical cash by counting denominations with automatic total calculation and transaction history.",
+  "requestFramePermissions": []
+}

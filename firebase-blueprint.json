@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A record of cash denominations counted and saved.",
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date and time the transaction was saved."
+        },
+        "breakdown": {
+          "type": "object",
+          "description": "Quantity of each denomination.",
+          "properties": {
+            "1000": { "type": "integer" },
+            "500": { "type": "integer" },
+            "200": { "type": "integer" },
+            "100": { "type": "integer" },
+            "50": { "type": "integer" },
+            "20": { "type": "integer" },
+            "10": { "type": "integer" },
+            "5": { "type": "integer" },
+            "1": { "type": "integer" }
+          }
+        },
+        "total": {
+          "type": "number",
+          "description": "The total amount calculated from the breakdown."
+        },
+        "uid": {
+          "type": "string",
+          "description": "The user ID who owns this transaction."
+        }
+      },
+      "required": ["date", "breakdown", "total", "uid"]
+    },
+    "ActivityLog": {
+      "title": "Activity Log",
+      "description": "A record of actions performed by the user.",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["CREATE", "UPDATE", "DELETE"],
+          "description": "The type of action performed."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the action occurred."
+        },
+        "details": {
+          "type": "object",
+          "description": "Details of the transaction involved."
+        },
+        "uid": {
+          "type": "string",
+          "description": "The user ID who performed the action."
+        }
+      },
+      "required": ["action", "timestamp", "details", "uid"]
+    }
+  },
+  "firestore": {
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Collection of cash denomination transactions."
+    },
+    "/activityLogs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Collection of user activity logs."
+    }
+  }
+}
