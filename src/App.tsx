@@ -266,10 +266,7 @@ export default function App() {
     }
 
     const path = 'transactions';
-    const constraints = [
-      where('uid', '==', user.uid),
-      orderBy('date', 'desc')
-    ];
+    const constraints = [where('uid', '==', user.uid)];
 
     if (selectedDate) {
       const start = new Date(selectedDate);
@@ -294,6 +291,8 @@ export default function App() {
           hasPendingWrites: doc.metadata.hasPendingWrites
         };
       });
+      // Sort by date descending (newest first)
+      txs.sort((a, b) => b.date.getTime() - a.date.getTime());
       setTransactions(txs);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, path);
@@ -312,8 +311,7 @@ export default function App() {
     const path = 'activityLogs';
     const q = query(
       collection(db, path),
-      where('uid', '==', user.uid),
-      orderBy('timestamp', 'desc')
+      where('uid', '==', user.uid)
     );
 
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
@@ -328,6 +326,8 @@ export default function App() {
           hasPendingWrites: doc.metadata.hasPendingWrites
         };
       });
+      // Sort by timestamp descending (newest first)
+      logs.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       setActivityLogs(logs);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, path);
