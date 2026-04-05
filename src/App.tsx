@@ -22,6 +22,7 @@ import {
 } from 'firebase/auth';
 import { db, auth } from './firebase';
 import { Transaction, Breakdown, ActivityLog, Expense, DENOMINATIONS } from './types';
+import { APP_VERSION } from './constants';
 import { 
   Plus, 
   History, 
@@ -1862,7 +1863,13 @@ export default function App() {
           )}
         </AnimatePresence>
 
-
+        {/* Version Footer */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-t border-neutral-200 px-4 py-2 flex justify-between items-center text-xs text-neutral-400">
+          <div className="flex items-center gap-2">
+            <span className="text-neutral-500 font-medium">Cash Denom Tracker</span>
+          </div>
+          <span className="font-mono text-neutral-500">v{APP_VERSION}</span>
+        </div>
       </main>
     </div>
   );
