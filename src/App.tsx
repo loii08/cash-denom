@@ -1535,7 +1535,11 @@ export default function App() {
                         </div>
                         <div className="text-left">
                           <p className="font-bold text-neutral-900 flex items-center gap-2">
-                            {log.action} <span className="text-neutral-400 font-normal">₱ {log.details.total.toLocaleString()}</span>
+                            {log.action} {log.details.transactionId ? (
+                              <span className="text-neutral-400 font-normal">₱ {log.details.total?.toLocaleString() || 'Transaction'}</span>
+                            ) : (
+                              <span className="text-neutral-400 font-normal">₱ {log.details.amount?.toLocaleString() || 'Expense'}</span>
+                            )}
                             {log.hasPendingWrites && (
                               <RefreshCcw className="w-3 h-3 text-emerald-500 animate-spin" />
                             )}
@@ -1560,17 +1564,31 @@ export default function App() {
                           <div className="p-5 pt-0 space-y-2">
                             <div className="h-px bg-neutral-200 mb-4" />
                             <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">Details</p>
-                            {log.details.originalDate && (
-                              <p className="text-xs text-neutral-500 mb-2">Original Date: {new Date(log.details.originalDate).toLocaleDateString()}</p>
-                            )}
-                            <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                              {DENOMINATIONS.map(d => log.details.breakdown[d] > 0 && (
-                                <div key={d} className="flex justify-between text-sm">
-                                  <span className="text-neutral-500">₱ {d} × {log.details.breakdown[d]}</span>
-                                  <span className="font-medium text-neutral-700">₱ {(d * log.details.breakdown[d]).toLocaleString()}</span>
+                            {log.details.transactionId ? (
+                              <>
+                                {log.details.originalDate && (
+                                  <p className="text-xs text-neutral-500 mb-2">Original Date: {new Date(log.details.originalDate).toLocaleDateString()}</p>
+                                )}
+                                <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                                  {log.details.breakdown && DENOMINATIONS.map(d => log.details.breakdown[d] > 0 && (
+                                    <div key={d} className="flex justify-between text-sm">
+                                      <span className="text-neutral-500">₱ {d} × {log.details.breakdown[d]}</span>
+                                      <span className="font-medium text-neutral-700">₱ {(d * log.details.breakdown[d]).toLocaleString()}</span>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
-                            </div>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-sm text-neutral-700 mb-3">💰 {log.details.description}</p>
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-neutral-500">Amount:</span>
+                                    <span className="font-medium text-red-600">₱ {log.details.amount?.toLocaleString()}</span>
+                                  </div>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </motion.div>
                       )}
@@ -1672,117 +1690,7 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <AnimatePresence mode="wait">
-          {activeTab === 'expenses' ? (
-            <motion.div 
-              key="expenses"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-4"
-            >
-              {/* Add Expense Form */}
-              <div className="bg-white rounded-3xl shadow-sm border border-neutral-200 p-4 sm:p-6 space-y-4">
-                <h3 className="font-bold text-neutral-900 text-base sm:text-lg">Add Expense</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold text-neutral-600 mb-2 uppercase tracking-widest">Amount</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-bold text-emerald-600">₱</span>
-                      <input 
-                        type="number" 
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={expenseAmount}
-                        onChange={(e) => setExpenseAmount(e.target.value)}
-                        className="flex-1 px-4 py-3 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-base"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-neutral-600 mb-2 uppercase tracking-widest">Description</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g., Office supplies, lunch, transport"
-                      value={expenseDescription}
-                      onChange={(e) => setExpenseDescription(e.target.value)}
-                      maxLength={50}
-                      className="w-full px-4 py-3 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    />
-                  </div>
-                  <button 
-                    onClick={handleSaveExpense}
-                    disabled={isExpenseSaving}
-                    className="w-full py-3 font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all shadow-lg shadow-emerald-100 disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {isExpenseSaving ? (
-                      <motion.div 
-                        animate={{ rotate: 360 }}
-                        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                      />
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4" />
-                        Add Expense
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
 
-              {/* Expenses List */}
-              {expenses.length > 0 && (
-                <div className="bg-white rounded-3xl shadow-sm border border-neutral-200 overflow-hidden">
-                  <div className="p-4 sm:p-6 border-b border-neutral-100 bg-neutral-50/50">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-bold text-neutral-900">Expenses</h3>
-                      <div className="text-right">
-                        <p className="text-xs text-neutral-400 uppercase font-bold tracking-widest">Total</p>
-                        <p className="text-xl font-bold text-red-600">₱ {totalExpenses.toLocaleString()}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="divide-y divide-neutral-100">
-                    {expenses.map(expense => (
-                      <div key={expense.id} className="p-4 sm:p-6 flex items-center justify-between hover:bg-neutral-50 transition-colors">
-                        <div className="flex items-center gap-3 sm:gap-4 flex-1">
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-neutral-900 text-sm sm:text-base">{expense.description}</p>
-                            <p className="text-xs text-neutral-400">{expense.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {expense.date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
-                          </div>
-                        </div>
-                        <div className="text-right flex items-center gap-2 sm:gap-3">
-                          <p className="font-bold text-red-600 text-sm sm:text-base">₱ {expense.amount.toLocaleString()}</p>
-                          <button 
-                            onClick={() => setExpenseToDelete(expense)}
-                            className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {expenses.length === 0 && (
-                <div className="text-center py-12 bg-white rounded-3xl shadow-sm border border-neutral-200">
-                  <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <AlertCircle className="w-8 h-8 text-neutral-300" />
-                  </div>
-                  <p className="text-neutral-500 font-medium mb-1">No expenses yet</p>
-                  <p className="text-xs text-neutral-400">Add your first expense to track deductions</p>
-                </div>
-              )}
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
       </main>
     </div>
   );
