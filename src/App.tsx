@@ -389,12 +389,11 @@ export default function App() {
     const path = 'expenses';
     const q = query(
       collection(db, path),
-      where('uid', '==', user.uid),
-      orderBy('date', 'desc')
+      where('uid', '==', user.uid)
     );
 
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
-      const exp: Expense[] = snapshot.docs.map(doc => {
+      let exp: Expense[] = snapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
@@ -405,6 +404,8 @@ export default function App() {
           hasPendingWrites: doc.metadata.hasPendingWrites
         };
       });
+      // Sort by date descending (newest first)
+      exp.sort((a, b) => b.date.getTime() - a.date.getTime());
       setExpenses(exp);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, path);
