@@ -240,8 +240,6 @@ export default function App() {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      // Trigger sync when connection restored
-      setTimeout(() => syncOfflineDrafts(), 500);
     };
     const handleOffline = () => setIsOnline(false);
 
@@ -252,7 +250,15 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [user]);
+  }, []);
+
+  // Sync drafts when connection is restored
+  useEffect(() => {
+    if (isOnline && (draftTransactions.length > 0 || draftExpenses.length > 0)) {
+      const timer = setTimeout(() => syncOfflineDrafts(), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isOnline, draftTransactions, draftExpenses, syncOfflineDrafts]);
 
   // Install Prompt Handler
   useEffect(() => {
