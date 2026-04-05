@@ -1092,16 +1092,16 @@ export default function App() {
           <div className="relative z-10">
             <p className="text-emerald-100 text-sm font-medium uppercase tracking-wider mb-1 flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
-              Total Savings
+              {totalExpenses > 0 ? 'NET Savings' : 'Total Savings'}
             </p>
             <h2 className="text-5xl font-bold flex items-baseline gap-1 mb-1">
               <span className="text-3xl font-medium opacity-80">₱</span>
-              {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {(totalExpenses > 0 ? netTotal : grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h2>
             {totalExpenses > 0 && (
               <div className="text-sm text-emerald-100 mb-4">
-                <span>Expenses: ₱{totalExpenses.toLocaleString()} • </span>
-                <span className="font-semibold">Net: ₱{netTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span>Total Income: ₱{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} • </span>
+                <span>Expenses: ₱{totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             )}
             
@@ -1146,13 +1146,6 @@ export default function App() {
           >
             <History className="w-4 h-4" />
             History
-          </button>
-          <button 
-            onClick={() => setActiveTab('activity')}
-            className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'activity' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
-          >
-            <Activity className="w-4 h-4" />
-            Logs
           </button>
           <button 
             onClick={() => setActiveTab('activity')}
