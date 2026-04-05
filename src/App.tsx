@@ -1537,7 +1537,7 @@ export default function App() {
                 </div>
               )}
             </motion.div>
-          )}
+          ) : null}
         </AnimatePresence>
       </main>
     </div>
