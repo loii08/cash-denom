@@ -170,9 +170,10 @@ export default function App() {
     DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: 0 }), {})
   );
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'history' | 'activity' | 'expenses'>('history');
+  const [activeTab, setActiveTab] = useState<'history' | 'activity'>('history');
   const [showFabMenu, setShowFabMenu] = useState(false);
   const [fabMode, setFabMode] = useState<'transaction' | 'expense' | null>(null);
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [txToDelete, setTxToDelete] = useState<Transaction | null>(null);
@@ -439,6 +440,27 @@ export default function App() {
     return grandTotal - totalExpenses;
   }, [grandTotal, totalExpenses]);
 
+  const filteredHistoryItems = useMemo(() => {
+    const items: Array<{ type: 'transaction' | 'expense', date: Date, data: Transaction | Expense }> = [];
+    
+    // Add transactions
+    if (historyFilter === 'all' || historyFilter === 'income') {
+      transactions.forEach(tx => {
+        items.push({ type: 'transaction', date: tx.date, data: tx });
+      });
+    }
+    
+    // Add expenses
+    if (historyFilter === 'all' || historyFilter === 'expense') {
+      expenses.forEach(exp => {
+        items.push({ type: 'expense', date: exp.date, data: exp });
+      });
+    }
+    
+    // Sort by date descending
+    return items.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [transactions, expenses, historyFilter]);
+
   const handleQuantityChange = (denom: number, value: string) => {
     const sanitized = sanitizeInput(value);
     const qty = parseInt(sanitized) || 0;
@@ -579,16 +601,21 @@ export default function App() {
     setIsExpenseSaving(true);
     const path = 'expenses';
     try {
-      await addDoc(collection(db, path), {
+      const docRef = await addDoc(collection(db, path), {
         date: Timestamp.now(),
         amount,
         description: expenseDescription,
         uid: user.uid
       });
+      await logActivity('CREATE', { 
+        expenseId: docRef.id, 
+        amount, 
+        description: expenseDescription 
+      });
       addToast(`Expense recorded ₱${amount.toLocaleString()}`, 'success');
       setExpenseAmount('');
       setExpenseDescription('');
-      setActiveTab('expenses');
+      setFabMode(null);
     } catch (error) {
       addToast('Failed to save expense', 'error');
       handleFirestoreError(error, OperationType.CREATE, path);
@@ -604,6 +631,11 @@ export default function App() {
     const path = 'expenses';
     try {
       await deleteDoc(doc(db, path, expenseToDelete.id));
+      await logActivity('DELETE', { 
+        expenseId: expenseToDelete.id, 
+        amount: expenseToDelete.amount, 
+        description: expenseToDelete.description
+      });
       setExpenseToDelete(null);
       addToast('Expense deleted', 'success');
     } catch (error) {
@@ -1116,11 +1148,11 @@ export default function App() {
             History
           </button>
           <button 
-            onClick={() => setActiveTab('expenses')}
-            className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'expenses' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
+            onClick={() => setActiveTab('activity')}
+            className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'activity' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
           >
-            <AlertCircle className="w-4 h-4" />
-            Expenses
+            <Activity className="w-4 h-4" />
+            Logs
           </button>
           <button 
             onClick={() => setActiveTab('activity')}
@@ -1325,21 +1357,45 @@ export default function App() {
             >
               <CalendarPicker />
 
-              {transactions.length === 0 ? (
+              {/* Filter Buttons */}
+              <div className="flex gap-2 bg-white p-2 rounded-2xl shadow-sm border border-neutral-200">
+                <button
+                  onClick={() => setHistoryFilter('all')}
+                  className={`flex-1 py-2 rounded-lg font-semibold transition-all text-sm ${historyFilter === 'all' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setHistoryFilter('income')}
+                  className={`flex-1 py-2 rounded-lg font-semibold transition-all text-sm ${historyFilter === 'income' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
+                >
+                  Income
+                </button>
+                <button
+                  onClick={() => setHistoryFilter('expense')}
+                  className={`flex-1 py-2 rounded-lg font-semibold transition-all text-sm ${historyFilter === 'expense' ? 'bg-red-50 text-red-700' : 'text-neutral-500 hover:text-neutral-700'}`}
+                >
+                  Expenses
+                </button>
+              </div>
+
+              {filteredHistoryItems.length === 0 ? (
                 <div className="bg-white p-12 rounded-3xl text-center border border-neutral-200 border-dashed space-y-4">
                   <div className="w-16 h-16 bg-neutral-100 rounded-2xl flex items-center justify-center mx-auto">
                     <History className="w-8 h-8 text-neutral-300" />
                   </div>
                   <div>
-                    <p className="font-semibold text-neutral-700 mb-1">No transactions yet</p>
+                    <p className="font-semibold text-neutral-700 mb-1">No entries found</p>
                     <p className="text-sm text-neutral-400">
                       {selectedDate 
-                        ? `No transactions on ${selectedDate.toLocaleDateString()}.` 
-                        : 'Start by creating your first transaction'}
+                        ? `No entries on ${selectedDate.toLocaleDateString()}.` 
+                        : historyFilter !== 'all' 
+                        ? `No ${historyFilter} entries yet.`
+                        : 'Start by creating your first entry'}
                     </p>
                   </div>
                   <button
-                    onClick={() => { setActiveTab('new'); setSelectedDate(null); }}
+                    onClick={() => { setFabMode('transaction'); setSelectedDate(null); }}
                     className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-bold text-sm"
                   >
                     <Plus className="w-4 h-4" />
@@ -1347,14 +1403,15 @@ export default function App() {
                   </button>
                 </div>
               ) : (
-                transactions.map((tx) => (
+                filteredHistoryItems.map((item) => (
+                  item.type === 'transaction' ? (
                   <div 
-                    key={tx.id} 
+                    key={`tx-${(item.data as Transaction).id}`} 
                     className="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden"
                   >
                     <div className="flex items-center">
                       <button 
-                        onClick={() => setExpandedId(expandedId === tx.id ? null : tx.id!)}
+                        onClick={() => setExpandedId(expandedId === (item.data as Transaction).id ? null : (item.data as Transaction).id!)}
                         className="flex-1 p-5 flex items-center justify-between hover:bg-neutral-50 transition-colors"
                       >
                         <div className="flex items-center gap-4">
@@ -1363,27 +1420,27 @@ export default function App() {
                           </div>
                           <div className="text-left">
                             <p className="font-bold text-neutral-900 flex items-center gap-2">
-                              ₱ {tx.total.toLocaleString()}
-                              {tx.hasPendingWrites && (
+                              ₱ {(item.data as Transaction).total.toLocaleString()}
+                              {(item.data as Transaction).hasPendingWrites && (
                                 <RefreshCcw className="w-3 h-3 text-emerald-500 animate-spin" />
                               )}
                             </p>
                             <p className="text-xs text-neutral-500">by: {user?.displayName || 'User'}</p>
-                            <p className="text-xs text-neutral-400">{tx.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {tx.date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
+                            <p className="text-xs text-neutral-400">{(item.data as Transaction).date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {(item.data as Transaction).date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
                           </div>
                         </div>
-                        {expandedId === tx.id ? <ChevronDown className="w-5 h-5 text-neutral-300" /> : <ChevronRight className="w-5 h-5 text-neutral-300" />}
+                        {expandedId === (item.data as Transaction).id ? <ChevronDown className="w-5 h-5 text-neutral-300" /> : <ChevronRight className="w-5 h-5 text-neutral-300" />}
                       </button>
                       <div className="flex pr-4 gap-2">
                         <button 
-                          onClick={() => startEditing(tx)}
+                          onClick={() => startEditing(item.data as Transaction)}
                           className="p-2 text-neutral-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                           title="Edit"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => setTxToDelete(tx)}
+                          onClick={() => setTxToDelete(item.data as Transaction)}
                           className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                           title="Delete"
                         >
@@ -1393,7 +1450,7 @@ export default function App() {
                     </div>
                     
                     <AnimatePresence>
-                      {expandedId === tx.id && (
+                      {expandedId === (item.data as Transaction).id && (
                         <motion.div 
                           initial={{ height: 0 }}
                           animate={{ height: 'auto' }}
@@ -1404,10 +1461,10 @@ export default function App() {
                             <div className="h-px bg-neutral-200 mb-4" />
                             <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">Breakdown</p>
                             <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                              {DENOMINATIONS.map(d => tx.breakdown[d] > 0 && (
+                              {DENOMINATIONS.map(d => (item.data as Transaction).breakdown[d] > 0 && (
                                 <div key={d} className="flex justify-between text-sm">
-                                  <span className="text-neutral-500">₱ {d} × {tx.breakdown[d]}</span>
-                                  <span className="font-medium text-neutral-700">₱ {(d * tx.breakdown[d]).toLocaleString()}</span>
+                                  <span className="text-neutral-500">₱ {d} × {(item.data as Transaction).breakdown[d]}</span>
+                                  <span className="font-medium text-neutral-700">₱ {(d * (item.data as Transaction).breakdown[d]).toLocaleString()}</span>
                                 </div>
                               ))}
                             </div>
@@ -1416,6 +1473,32 @@ export default function App() {
                       )}
                     </AnimatePresence>
                   </div>
+                  ) : (
+                  <div 
+                    key={`exp-${(item.data as Expense).id}`} 
+                    className="bg-white rounded-2xl shadow-sm border border-neutral-200 p-5 flex items-center justify-between hover:bg-neutral-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <AlertCircle className="w-6 h-6 text-red-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-neutral-900">{(item.data as Expense).description}</p>
+                        <p className="text-xs text-neutral-400">{(item.data as Expense).date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {(item.data as Expense).date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <p className="font-bold text-red-600">₱ {(item.data as Expense).amount.toLocaleString()}</p>
+                      <button 
+                        onClick={() => setExpenseToDelete(item.data as Expense)}
+                        className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  )
                 ))
               )}
             </motion.div>

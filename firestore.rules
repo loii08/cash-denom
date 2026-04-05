@@ -61,8 +61,7 @@ service cloud.firestore {
     }
 
     match /activityLogs/{logId} {
-      allow read: if 
-      () && request.query.where[0].value == request.auth.uid;
+      allow read: if isAuthenticated() && request.query.where[0].value == request.auth.uid;
       allow list: if isAuthenticated();
       allow create: if isAuthenticated() && isValidActivityLog(request.resource.data) && uidUnchanged();
       allow update, delete: if false;
