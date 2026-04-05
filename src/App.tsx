@@ -21,7 +21,7 @@ import {
   User 
 } from 'firebase/auth';
 import { db, auth } from './firebase';
-import { Transaction, Breakdown, ActivityLog, DENOMINATIONS } from './types';
+import { Transaction, Breakdown, ActivityLog, Expense, DENOMINATIONS } from './types';
 import { 
   Plus, 
   History, 
@@ -170,7 +170,7 @@ export default function App() {
     DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: 0 }), {})
   );
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'new' | 'history' | 'activity'>('new');
+  const [activeTab, setActiveTab] = useState<'new' | 'history' | 'activity' | 'expenses'>('new');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [txToDelete, setTxToDelete] = useState<Transaction | null>(null);
@@ -186,6 +186,11 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenseAmount, setExpenseAmount] = useState('');
+  const [expenseDescription, setExpenseDescription] = useState('');
+  const [isExpenseSaving, setIsExpenseSaving] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
   // --- Toast Helper ---
   const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
@@ -371,6 +376,40 @@ export default function App() {
     return () => unsubscribe();
   }, [user, isAuthReady]);
 
+  // Expenses Listener
+  useEffect(() => {
+    if (!user || !isAuthReady) {
+      setExpenses([]);
+      return;
+    }
+
+    const path = 'expenses';
+    const q = query(
+      collection(db, path),
+      where('uid', '==', user.uid),
+      orderBy('date', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
+      const exp: Expense[] = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          date: (data.date as Timestamp).toDate(),
+          amount: data.amount,
+          description: data.description,
+          uid: data.uid,
+          hasPendingWrites: doc.metadata.hasPendingWrites
+        };
+      });
+      setExpenses(exp);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    });
+
+    return () => unsubscribe();
+  }, [user, isAuthReady]);
+
   const currentTotal = useMemo(() => {
     return DENOMINATIONS.reduce((acc, d) => acc + (d * (quantities[d] || 0)), 0);
   }, [quantities]);
@@ -389,6 +428,14 @@ export default function App() {
       count: transactions.length
     };
   }, [transactions]);
+
+  const totalExpenses = useMemo(() => {
+    return expenses.reduce((acc, exp) => acc + exp.amount, 0);
+  }, [expenses]);
+
+  const netTotal = useMemo(() => {
+    return grandTotal - totalExpenses;
+  }, [grandTotal, totalExpenses]);
 
   const handleQuantityChange = (denom: number, value: string) => {
     const sanitized = sanitizeInput(value);
@@ -512,6 +559,57 @@ export default function App() {
   const cancelEditing = () => {
     setEditingId(null);
     setQuantities(DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: 0 }), {}));
+  };
+
+  const handleSaveExpense = async () => {
+    if (!user) return;
+    if (!expenseAmount || !expenseDescription) {
+      addToast('Please enter both amount and description', 'warning');
+      return;
+    }
+
+    const amount = parseFloat(expenseAmount);
+    if (isNaN(amount) || amount <= 0) {
+      addToast('Please enter a valid amount', 'warning');
+      return;
+    }
+
+    setIsExpenseSaving(true);
+    const path = 'expenses';
+    try {
+      await addDoc(collection(db, path), {
+        date: Timestamp.now(),
+        amount,
+        description: expenseDescription,
+        uid: user.uid
+      });
+      addToast(`Expense recorded ₱${amount.toLocaleString()}`, 'success');
+      setExpenseAmount('');
+      setExpenseDescription('');
+      setActiveTab('expenses');
+    } catch (error) {
+      addToast('Failed to save expense', 'error');
+      handleFirestoreError(error, OperationType.CREATE, path);
+    } finally {
+      setIsExpenseSaving(false);
+    }
+  };
+
+  const handleDeleteExpense = async () => {
+    if (!user || !expenseToDelete || !expenseToDelete.id) return;
+    
+    setIsDeleting(true);
+    const path = 'expenses';
+    try {
+      await deleteDoc(doc(db, path, expenseToDelete.id));
+      setExpenseToDelete(null);
+      addToast('Expense deleted', 'success');
+    } catch (error) {
+      addToast('Failed to delete expense', 'error');
+      handleFirestoreError(error, OperationType.DELETE, path);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleLogin = async () => {
@@ -743,6 +841,48 @@ export default function App() {
     );
   };
 
+  const ExpenseDeleteModal = () => {
+    if (!expenseToDelete) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl"
+        >
+          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center text-red-600 mx-auto mb-4">
+            <Trash2 className="w-8 h-8" />
+          </div>
+          <h3 className="text-xl font-bold text-neutral-900 text-center mb-2">Delete Expense?</h3>
+          <p className="text-neutral-500 text-center mb-6">
+            Are you sure you want to delete this expense of <span className="font-bold text-neutral-900">₱ {expenseToDelete.amount.toLocaleString()}</span>? This action cannot be undone.
+          </p>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => setExpenseToDelete(null)}
+              className="flex-1 py-3 font-bold text-neutral-500 hover:bg-neutral-100 rounded-xl transition-all"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={handleDeleteExpense}
+              disabled={isDeleting}
+              className="flex-1 py-3 font-bold bg-red-600 hover:bg-red-700 text-white rounded-xl transition-all shadow-lg shadow-red-100 flex items-center justify-center gap-2"
+            >
+              {isDeleting ? (
+                <motion.div 
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                  className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                />
+              ) : 'Delete'}
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  };
+
   if (!isAuthReady) {
     return (
       <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
@@ -905,6 +1045,7 @@ export default function App() {
 
       <main className="max-w-2xl mx-auto p-4 space-y-6">
         <DeleteModal />
+        <ExpenseDeleteModal />
         <UserProfile />
         
         {/* Total Savings Banner with Stats */}
@@ -919,10 +1060,16 @@ export default function App() {
               <BarChart3 className="w-4 h-4" />
               Total Savings
             </p>
-            <h2 className="text-5xl font-bold flex items-baseline gap-1 mb-4">
+            <h2 className="text-5xl font-bold flex items-baseline gap-1 mb-1">
               <span className="text-3xl font-medium opacity-80">₱</span>
               {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h2>
+            {totalExpenses > 0 && (
+              <div className="text-sm text-emerald-100 mb-4">
+                <span>Expenses: ₱{totalExpenses.toLocaleString()} • </span>
+                <span className="font-semibold">Net: ₱{netTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
             
             <AnimatePresence>
               {showStats && stats.count > 0 && (
@@ -958,27 +1105,38 @@ export default function App() {
         </motion.div>
 
         {/* Tab Navigation */}
-        <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-neutral-200">
+        <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-neutral-200 flex-wrap">
           <button 
             onClick={() => { setActiveTab('new'); if (!editingId) cancelEditing(); }}
-            className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'new' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
+            className={`flex-1 min-w-24 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'new' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
           >
             <Plus className="w-4 h-4" />
-            {editingId ? 'Edit Entry' : 'New Entry'}
+            <span className="hidden sm:inline">New Entry</span>
+            <span className="sm:hidden">New</span>
           </button>
           <button 
             onClick={() => setActiveTab('history')}
-            className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'history' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
+            className={`flex-1 min-w-24 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'history' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
           >
             <History className="w-4 h-4" />
-            History
+            <span className="hidden sm:inline">History</span>
+            <span className="sm:hidden">TX</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('expenses')}
+            className={`flex-1 min-w-24 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'expenses' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
+          >
+            <AlertCircle className="w-4 h-4" />
+            <span className="hidden sm:inline">Expenses</span>
+            <span className="sm:hidden">Exp</span>
           </button>
           <button 
             onClick={() => setActiveTab('activity')}
-            className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'activity' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
+            className={`flex-1 min-w-24 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'activity' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
           >
             <Activity className="w-4 h-4" />
-            Logs
+            <span className="hidden sm:inline">Logs</span>
+            <span className="sm:hidden">Log</span>
           </button>
         </div>
 
@@ -1268,6 +1426,115 @@ export default function App() {
                     </AnimatePresence>
                   </div>
                 ))
+              )}
+            </motion.div>
+          )}
+          {activeTab === 'expenses' ? (
+            <motion.div 
+              key="expenses"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-4"
+            >
+              {/* Add Expense Form */}
+              <div className="bg-white rounded-3xl shadow-sm border border-neutral-200 p-4 sm:p-6 space-y-4">
+                <h3 className="font-bold text-neutral-900 text-base sm:text-lg">Add Expense</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-600 mb-2 uppercase tracking-widest">Amount</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold text-emerald-600">₱</span>
+                      <input 
+                        type="number" 
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={expenseAmount}
+                        onChange={(e) => setExpenseAmount(e.target.value)}
+                        className="flex-1 px-4 py-3 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-base"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-600 mb-2 uppercase tracking-widest">Description</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g., Office supplies, lunch, transport"
+                      value={expenseDescription}
+                      onChange={(e) => setExpenseDescription(e.target.value)}
+                      maxLength={50}
+                      className="w-full px-4 py-3 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+                  <button 
+                    onClick={handleSaveExpense}
+                    disabled={isExpenseSaving}
+                    className="w-full py-3 font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all shadow-lg shadow-emerald-100 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isExpenseSaving ? (
+                      <motion.div 
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                      />
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        Add Expense
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Expenses List */}
+              {expenses.length > 0 && (
+                <div className="bg-white rounded-3xl shadow-sm border border-neutral-200 overflow-hidden">
+                  <div className="p-4 sm:p-6 border-b border-neutral-100 bg-neutral-50/50">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-bold text-neutral-900">Expenses</h3>
+                      <div className="text-right">
+                        <p className="text-xs text-neutral-400 uppercase font-bold tracking-widest">Total</p>
+                        <p className="text-xl font-bold text-red-600">₱ {totalExpenses.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-neutral-100">
+                    {expenses.map(expense => (
+                      <div key={expense.id} className="p-4 sm:p-6 flex items-center justify-between hover:bg-neutral-50 transition-colors">
+                        <div className="flex items-center gap-3 sm:gap-4 flex-1">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-neutral-900 text-sm sm:text-base">{expense.description}</p>
+                            <p className="text-xs text-neutral-400">{expense.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {expense.date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
+                          </div>
+                        </div>
+                        <div className="text-right flex items-center gap-2 sm:gap-3">
+                          <p className="font-bold text-red-600 text-sm sm:text-base">₱ {expense.amount.toLocaleString()}</p>
+                          <button 
+                            onClick={() => setExpenseToDelete(expense)}
+                            className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {expenses.length === 0 && (
+                <div className="text-center py-12 bg-white rounded-3xl shadow-sm border border-neutral-200">
+                  <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <AlertCircle className="w-8 h-8 text-neutral-300" />
+                  </div>
+                  <p className="text-neutral-500 font-medium mb-1">No expenses yet</p>
+                  <p className="text-xs text-neutral-400">Add your first expense to track deductions</p>
+                </div>
               )}
             </motion.div>
           )}

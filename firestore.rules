@@ -32,6 +32,15 @@ service cloud.firestore {
            data.uid == request.auth.uid;
   }
 
+  function isValidExpense(data) {
+    return data.date is timestamp &&
+           data.amount is number &&
+           data.amount > 0 &&
+           data.description is string &&
+           data.uid is string &&
+           data.uid == request.auth.uid;
+  }
+
   function isAdmin() {
     return isAuthenticated() &&
       request.auth.token.email == "kenneth.irvinb@gmail.com" && 
@@ -61,6 +70,14 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow create, update: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated() && request.query.where[0].value == request.auth.uid;
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidExpense(request.resource.data);
+      allow update: if isAuthenticated() && isValidExpense(request.resource.data) && (isDocOwner() || isAdmin()) && request.resource.data.uid == resource.data.uid;
+      allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
     }
 
     match /test/connection {

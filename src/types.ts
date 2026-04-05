@@ -25,4 +25,13 @@ export interface ActivityLog {
   hasPendingWrites?: boolean;
 }
 
+export interface Expense {
+  id?: string;
+  date: Date;
+  amount: number;
+  description: string;
+  uid: string;
+  hasPendingWrites?: boolean;
+}
+
 export const DENOMINATIONS = [1000, 500, 200, 100, 50, 20, 10, 5, 1];
