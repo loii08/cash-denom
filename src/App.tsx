@@ -170,7 +170,9 @@ export default function App() {
     DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: 0 }), {})
   );
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'new' | 'history' | 'activity' | 'expenses'>('new');
+  const [activeTab, setActiveTab] = useState<'history' | 'activity' | 'expenses'>('history');
+  const [showFabMenu, setShowFabMenu] = useState(false);
+  const [fabMode, setFabMode] = useState<'transaction' | 'expense' | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [txToDelete, setTxToDelete] = useState<Transaction | null>(null);
@@ -1105,69 +1107,131 @@ export default function App() {
         </motion.div>
 
         {/* Tab Navigation */}
-        <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-neutral-200 flex-wrap">
-          <button 
-            onClick={() => { setActiveTab('new'); if (!editingId) cancelEditing(); }}
-            className={`flex-1 min-w-24 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'new' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Entry</span>
-            <span className="sm:hidden">New</span>
-          </button>
+        <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-neutral-200">
           <button 
             onClick={() => setActiveTab('history')}
-            className={`flex-1 min-w-24 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'history' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
+            className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'history' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
           >
             <History className="w-4 h-4" />
-            <span className="hidden sm:inline">History</span>
-            <span className="sm:hidden">TX</span>
+            History
           </button>
           <button 
             onClick={() => setActiveTab('expenses')}
-            className={`flex-1 min-w-24 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'expenses' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
+            className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'expenses' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
           >
             <AlertCircle className="w-4 h-4" />
-            <span className="hidden sm:inline">Expenses</span>
-            <span className="sm:hidden">Exp</span>
+            Expenses
           </button>
           <button 
             onClick={() => setActiveTab('activity')}
-            className={`flex-1 min-w-24 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'activity' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
+            className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'activity' ? 'bg-emerald-50 text-emerald-700' : 'text-neutral-500 hover:text-neutral-700'}`}
           >
             <Activity className="w-4 h-4" />
-            <span className="hidden sm:inline">Logs</span>
-            <span className="sm:hidden">Log</span>
+            Logs
           </button>
         </div>
 
-        <AnimatePresence mode="wait">
-          {activeTab === 'new' ? (
-            <motion.div 
-              key="new-entry"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-4"
+        {/* Floating Action Button Menu */}
+        <AnimatePresence>
+          {showFabMenu && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowFabMenu(false)}
+              className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm"
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showFabMenu && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 20 }}
+              className="fixed bottom-24 right-6 z-50 flex flex-col gap-3 sm:right-8"
             >
-              <div className="bg-white rounded-3xl shadow-sm border border-neutral-200 overflow-hidden flex flex-col">
-                <div className="p-4 sm:p-6 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/50 backdrop-blur-md">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <h3 className="font-bold text-neutral-900 text-base sm:text-lg">{editingId ? 'Edit Transaction' : 'Denominations'}</h3>
-                    {editingId && (
-                      <button 
-                        onClick={cancelEditing}
-                        className="text-xs bg-neutral-200 text-neutral-600 px-2 py-1 rounded-md hover:bg-neutral-300 transition-colors flex items-center gap-1"
-                      >
-                        <X className="w-3 h-3" /> Cancel
-                      </button>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-neutral-400 uppercase font-bold tracking-widest">Subtotal</p>
-                    <p className="text-lg sm:text-xl font-bold text-emerald-600">₱ {currentTotal.toLocaleString()}</p>
-                  </div>
+              <button
+                onClick={() => {
+                  setFabMode('expense');
+                  setShowFabMenu(false);
+                }}
+                className="flex items-center gap-3 px-4 py-3 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all"
+              >
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                <span className="font-semibold text-neutral-900 whitespace-nowrap">Add Expense</span>
+              </button>
+              <button
+                onClick={() => {
+                  setFabMode('transaction');
+                  setShowFabMenu(false);
+                }}
+                className="flex items-center gap-3 px-4 py-3 bg-emerald-600 text-white rounded-2xl shadow-lg hover:shadow-xl transition-all"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="font-semibold whitespace-nowrap">New Entry</span>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* FAB Button */}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowFabMenu(!showFabMenu)}
+          className="fixed bottom-6 right-6 z-50 w-14 h-14 sm:w-16 sm:h-16 bg-emerald-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
+        >
+          <motion.div
+            animate={{ rotate: showFabMenu ? 45 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Plus className="w-6 h-6 sm:w-7 sm:h-7" />
+          </motion.div>
+        </motion.button>
+        {/* New Entry Modal */}
+        <AnimatePresence>
+          {fabMode === 'transaction' && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setFabMode(null);
+                if (!editingId) cancelEditing();
+              }}
+              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {fabMode === 'transaction' && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <motion.div 
+                className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-4 sm:p-6 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/50 sticky top-0">
+                  <h3 className="font-bold text-neutral-900 text-base sm:text-lg">{editingId ? 'Edit Transaction' : 'New Entry'}</h3>
+                  <button 
+                    onClick={() => {
+                      setFabMode(null);
+                      cancelEditing();
+                    }}
+                    className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-neutral-500" />
+                  </button>
                 </div>
-                <div className="p-4 sm:p-6 space-y-3 overflow-y-auto">
+                <div className="p-4 sm:p-6 space-y-3 max-h-[calc(80vh-140px)] overflow-y-auto">
                   {DENOMINATIONS.map((d) => (
                     <div key={d} className="space-y-0">
                       <div className="flex items-center gap-2 sm:gap-3">
@@ -1179,7 +1243,10 @@ export default function App() {
                           onChange={(e) => handleQuantityChange(d, e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleSave();
-                            if (e.key === 'Escape') cancelEditing();
+                            if (e.key === 'Escape') {
+                              setFabMode(null);
+                              cancelEditing();
+                            }
                           }}
                           onWheel={(e) => e.currentTarget.blur()}
                           placeholder="0"
@@ -1201,7 +1268,11 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <div className="p-4 sm:p-6 bg-neutral-50 border-t border-neutral-100 space-y-3">
+                <div className="p-4 sm:p-6 bg-neutral-50 border-t border-neutral-100 space-y-3 sticky bottom-0">
+                  <div className="text-right">
+                    <p className="text-xs text-neutral-400 uppercase font-bold tracking-widest">Subtotal</p>
+                    <p className="text-2xl font-bold text-emerald-600">₱ {currentTotal.toLocaleString()}</p>
+                  </div>
                   <button 
                     onClick={handleSave}
                     disabled={isSaving || currentTotal === 0}
@@ -1238,9 +1309,13 @@ export default function App() {
                     </button>
                   )}
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
-          ) : activeTab === 'history' ? (
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence mode="wait">
+          {activeTab === 'history' ? (
             <motion.div 
               key="history"
               initial={{ opacity: 0, x: 20 }}
@@ -1429,6 +1504,99 @@ export default function App() {
               )}
             </motion.div>
           )}
+          {/* Add Expense Modal */}
+          {fabMode === 'expense' && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setFabMode(null)}
+              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {fabMode === 'expense' && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <motion.div 
+                className="bg-white rounded-3xl shadow-2xl max-w-md w-full"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-4 sm:p-6 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/50">
+                  <h3 className="font-bold text-neutral-900 text-base sm:text-lg">Add Expense</h3>
+                  <button 
+                    onClick={() => setFabMode(null)}
+                    className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-neutral-500" />
+                  </button>
+                </div>
+                <div className="p-4 sm:p-6 space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-600 mb-2 uppercase tracking-widest">Amount</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold text-emerald-600">₱</span>
+                      <input 
+                        type="number" 
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={expenseAmount}
+                        onChange={(e) => setExpenseAmount(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveExpense();
+                          if (e.key === 'Escape') setFabMode(null);
+                        }}
+                        className="flex-1 px-4 py-3 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-base"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-600 mb-2 uppercase tracking-widest">Description</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g., Office supplies, lunch, transport"
+                      value={expenseDescription}
+                      onChange={(e) => setExpenseDescription(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveExpense();
+                        if (e.key === 'Escape') setFabMode(null);
+                      }}
+                      maxLength={50}
+                      className="w-full px-4 py-3 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+                  <button 
+                    onClick={handleSaveExpense}
+                    disabled={isExpenseSaving}
+                    className="w-full py-3 font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all shadow-lg shadow-emerald-100 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isExpenseSaving ? (
+                      <motion.div 
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                      />
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        Add Expense
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence mode="wait">
           {activeTab === 'expenses' ? (
             <motion.div 
               key="expenses"
