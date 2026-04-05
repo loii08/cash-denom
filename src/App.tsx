@@ -227,9 +227,6 @@ export default function App() {
       }
     }
   }, []);
-  const [draftTransactions, setDraftTransactions] = useState<Transaction[]>([]);
-  const [draftExpenses, setDraftExpenses] = useState<Expense[]>([]);
-  const syncInProgressRef = useRef(false);
 
   // --- Toast Helper ---
   const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
