@@ -2,42 +2,53 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+let initialized = false;
+let authInstance: any = null;
+let dbInstance: any = null;
+
+const ensureInitialized = () => {
+  if (initialized) return;
+  
+  const firebaseConfig = {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+  };
+
+  const existingApps = getApps();
+  const app = existingApps.length > 0 ? existingApps[0] : initializeApp(firebaseConfig);
+
+  const firestoreDatabaseId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
+  authInstance = getAuth(app);
+  dbInstance = getFirestore(app, firestoreDatabaseId || undefined);
+  
+  initialized = true;
 };
 
-// Initialize Firebase (only once)
-let app: any;
-try {
-  const existingApps = getApps();
-  app = existingApps.length > 0 ? existingApps[0] : initializeApp(firebaseConfig);
-} catch (error) {
-  console.error('Firebase initialization error:', error);
-  throw error;
-}
+export const getAuth_ = () => {
+  ensureInitialized();
+  return authInstance;
+};
 
-// Export auth and db with proper initialization
-export const auth = (() => {
-  try {
-    return getAuth(app);
-  } catch (error) {
-    console.error('Auth initialization error:', error);
-    throw error;
-  }
-})();
+export const getDb = () => {
+  ensureInitialized();
+  return dbInstance;
+};
 
-export const db = (() => {
-  try {
-    const firestoreDatabaseId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
-    return getFirestore(app, firestoreDatabaseId || undefined);
-  } catch (error) {
-    console.error('Firestore initialization error:', error);
-    throw error;
+// Create proxy objects to lazily initialize
+export const auth = new Proxy({}, {
+  get(target, prop) {
+    const instance = getAuth_();
+    return (instance as any)[prop];
   }
-})();
+});
+
+export const db = new Proxy({}, {
+  get(target, prop) {
+    const instance = getDb();
+    return (instance as any)[prop];
+  }
+});
