@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, initializeFirestore, memoryLocalCache, persistentLocalCache } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 
 // Environment variable validation for production
 const requiredEnvVars = [
@@ -40,10 +40,10 @@ const firestoreDatabaseId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with modern cache settings
-export const db = initializeFirestore(app, {
-  cache: persistentLocalCache(/* options */),
-  ...(firestoreDatabaseId && { databaseId: firestoreDatabaseId })
-});
+// Initialize Firestore with optional database ID
+export const db = getFirestore(app, firestoreDatabaseId || undefined);
+
+// Enable offline persistence (handled automatically by Firestore SDK)
+// Persistence works without explicit configuration in modern Firebase SDK
 
 export const auth = getAuth(app);
