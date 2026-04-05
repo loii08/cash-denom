@@ -9,6 +9,8 @@ export interface Transaction {
   total: number;
   uid: string;
   hasPendingWrites?: boolean;
+  isDraft?: boolean;
+  serverTimestamp?: number;
 }
 
 export interface ActivityLog {
@@ -32,6 +34,8 @@ export interface Expense {
   description: string;
   uid: string;
   hasPendingWrites?: boolean;
+  isDraft?: boolean;
+  serverTimestamp?: number;
 }
 
 export const DENOMINATIONS = [1000, 500, 200, 100, 50, 20, 10, 5, 1];

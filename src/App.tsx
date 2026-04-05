@@ -194,6 +194,42 @@ export default function App() {
   const [expenseDescription, setExpenseDescription] = useState('');
   const [isExpenseSaving, setIsExpenseSaving] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+  const [draftTransactions, setDraftTransactions] = useState<Transaction[]>([]);
+  const [draftExpenses, setDraftExpenses] = useState<Expense[]>([]);
+  const syncInProgressRef = useRef(false);
+
+  // Load drafts from localStorage on mount
+  useEffect(() => {
+    const savedDraftTxs = localStorage.getItem('draftTransactions');
+    const savedDraftExpenses = localStorage.getItem('draftExpenses');
+    if (savedDraftTxs) {
+      try {
+        const parsed = JSON.parse(savedDraftTxs);
+        setDraftTransactions(parsed.map((t: any) => ({
+          ...t,
+          date: new Date(t.date),
+          isDraft: true
+        })));
+      } catch (e) {
+        console.error('Failed to parse draft transactions');
+      }
+    }
+    if (savedDraftExpenses) {
+      try {
+        const parsed = JSON.parse(savedDraftExpenses);
+        setDraftExpenses(parsed.map((e: any) => ({
+          ...e,
+          date: new Date(e.date),
+          isDraft: true
+        })));
+      } catch (e) {
+        console.error('Failed to parse draft expenses');
+      }
+    }
+  }, []);
+  const [draftTransactions, setDraftTransactions] = useState<Transaction[]>([]);
+  const [draftExpenses, setDraftExpenses] = useState<Expense[]>([]);
+  const syncInProgressRef = useRef(false);
 
   // --- Toast Helper ---
   const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
@@ -205,7 +241,11 @@ export default function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
+    const handleOnline = () => {
+      setIsOnline(true);
+      // Trigger sync when connection restored
+      setTimeout(() => syncOfflineDrafts(), 500);
+    };
     const handleOffline = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
@@ -215,7 +255,7 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [user]);
 
   // Install Prompt Handler
   useEffect(() => {
@@ -449,6 +489,10 @@ export default function App() {
       transactions.forEach(tx => {
         items.push({ type: 'transaction', date: tx.date, data: tx });
       });
+      // Add draft transactions
+      draftTransactions.forEach(tx => {
+        items.push({ type: 'transaction', date: tx.date, data: tx });
+      });
     }
     
     // Add expenses
@@ -456,11 +500,15 @@ export default function App() {
       expenses.forEach(exp => {
         items.push({ type: 'expense', date: exp.date, data: exp });
       });
+      // Add draft expenses
+      draftExpenses.forEach(exp => {
+        items.push({ type: 'expense', date: exp.date, data: exp });
+      });
     }
     
     // Sort by date descending
     return items.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [transactions, expenses, historyFilter]);
+  }, [transactions, expenses, draftTransactions, draftExpenses, historyFilter]);
 
   const handleQuantityChange = (denom: number, value: string) => {
     const sanitized = sanitizeInput(value);
@@ -496,6 +544,69 @@ export default function App() {
     }
   };
 
+  // Sync offline drafts to Firestore
+  const syncOfflineDrafts = useCallback(async () => {
+    if (!user || !isOnline || syncInProgressRef.current) return;
+    
+    syncInProgressRef.current = true;
+    try {
+      // Sync draft transactions
+      for (const draft of draftTransactions) {
+        try {
+          const serverTimestamp = Date.now();
+          await addDoc(collection(db, 'transactions'), {
+            date: Timestamp.fromDate(draft.date),
+            breakdown: draft.breakdown,
+            total: draft.total,
+            uid: user.uid,
+            serverTimestamp
+          });
+          await logActivity('CREATE', {
+            transactionId: 'synced-draft',
+            total: draft.total,
+            breakdown: draft.breakdown
+          });
+        } catch (error) {
+          console.error('Failed to sync transaction draft:', error);
+        }
+      }
+
+      // Sync draft expenses
+      for (const draft of draftExpenses) {
+        try {
+          const serverTimestamp = Date.now();
+          await addDoc(collection(db, 'expenses'), {
+            date: Timestamp.fromDate(draft.date),
+            amount: draft.amount,
+            description: draft.description,
+            uid: user.uid,
+            serverTimestamp
+          });
+          await logActivity('CREATE', {
+            expenseId: 'synced-draft',
+            amount: draft.amount,
+            description: draft.description
+          });
+        } catch (error) {
+          console.error('Failed to sync expense draft:', error);
+        }
+      }
+
+      // Clear drafts after successful sync
+      if (draftTransactions.length > 0 || draftExpenses.length > 0) {
+        setDraftTransactions([]);
+        setDraftExpenses([]);
+        localStorage.removeItem('draftTransactions');
+        localStorage.removeItem('draftExpenses');
+        addToast('Synced all offline changes', 'success');
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+    } finally {
+      syncInProgressRef.current = false;
+    }
+  }, [user, isOnline, draftTransactions, draftExpenses, addToast]);
+
   const handleSave = async () => {
     if (!user) return;
     if (currentTotal === 0) {
@@ -528,18 +639,35 @@ export default function App() {
         setEditingId(null);
         addToast('Transaction updated successfully', 'success');
       } else {
-        const docRef = await addDoc(collection(db, path), {
-          date: Timestamp.now(),
-          breakdown: quantities,
-          total: currentTotal,
-          uid: user.uid
-        });
-        await logActivity('CREATE', { 
-          transactionId: docRef.id, 
-          total: currentTotal, 
-          breakdown: quantities 
-        });
-        addToast(`Saved ₱${currentTotal.toLocaleString()}`, 'success');
+        // Save transaction (online or offline)
+        if (isOnline) {
+          const docRef = await addDoc(collection(db, path), {
+            date: Timestamp.now(),
+            breakdown: quantities,
+            total: currentTotal,
+            uid: user.uid
+          });
+          await logActivity('CREATE', { 
+            transactionId: docRef.id, 
+            total: currentTotal, 
+            breakdown: quantities 
+          });
+          addToast(`Saved ₱${currentTotal.toLocaleString()}`, 'success');
+        } else {
+          // Save as draft when offline
+          const newDraft: Transaction = {
+            id: `draft-${Date.now()}`,
+            date: new Date(),
+            breakdown: quantities,
+            total: currentTotal,
+            uid: user.uid,
+            isDraft: true
+          };
+          const updated = [newDraft, ...draftTransactions];
+          setDraftTransactions(updated);
+          localStorage.setItem('draftTransactions', JSON.stringify(updated));
+          addToast(`DRAFT: ₱${currentTotal.toLocaleString()} (will sync when online)`, 'warning');
+        }
       }
       // Reset quantities after save
       setQuantities(DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: 0 }), {}));
@@ -602,24 +730,56 @@ export default function App() {
     setIsExpenseSaving(true);
     const path = 'expenses';
     try {
-      const docRef = await addDoc(collection(db, path), {
-        date: Timestamp.now(),
-        amount,
-        description: expenseDescription,
-        uid: user.uid
-      });
-      await logActivity('CREATE', { 
-        expenseId: docRef.id, 
-        amount, 
-        description: expenseDescription 
-      });
-      addToast(`Expense recorded ₱${amount.toLocaleString()}`, 'success');
+      if (isOnline) {
+        const docRef = await addDoc(collection(db, path), {
+          date: Timestamp.now(),
+          amount,
+          description: expenseDescription,
+          uid: user.uid
+        });
+        await logActivity('CREATE', { 
+          expenseId: docRef.id, 
+          amount, 
+          description: expenseDescription 
+        });
+        addToast(`Expense recorded ₱${amount.toLocaleString()}`, 'success');
+      } else {
+        // Save as draft when offline
+        const newDraft: Expense = {
+          id: `draft-${Date.now()}`,
+          date: new Date(),
+          amount,
+          description: expenseDescription,
+          uid: user.uid,
+          isDraft: true
+        };
+        const updated = [newDraft, ...draftExpenses];
+        setDraftExpenses(updated);
+        localStorage.setItem('draftExpenses', JSON.stringify(updated));
+        addToast(`DRAFT: Expense ₱${amount.toLocaleString()} (will sync when online)`, 'warning');
+      }
       setExpenseAmount('');
       setExpenseDescription('');
       setFabMode(null);
     } catch (error) {
-      addToast('Failed to save expense', 'error');
-      handleFirestoreError(error, OperationType.CREATE, path);
+      // If online save fails, save as draft
+      if (!isOnline) {
+        const newDraft: Expense = {
+          id: `draft-${Date.now()}`,
+          date: new Date(),
+          amount,
+          description: expenseDescription,
+          uid: user.uid,
+          isDraft: true
+        };
+        const updated = [newDraft, ...draftExpenses];
+        setDraftExpenses(updated);
+        localStorage.setItem('draftExpenses', JSON.stringify(updated));
+        addToast(`DRAFT: Saved offline, will sync when connected`, 'warning');
+      } else {
+        addToast('Failed to save expense', 'error');
+        handleFirestoreError(error, OperationType.CREATE, path);
+      }
     } finally {
       setIsExpenseSaving(false);
     }
@@ -1415,6 +1575,9 @@ export default function App() {
                           <div className="text-left">
                             <p className="font-bold text-neutral-900 flex items-center gap-2">
                               ₱ {(item.data as Transaction).total.toLocaleString()}
+                              {(item.data as Transaction).isDraft && (
+                                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">DRAFT</span>
+                              )}
                               {(item.data as Transaction).hasPendingWrites && (
                                 <RefreshCcw className="w-3 h-3 text-emerald-500 animate-spin" />
                               )}
@@ -1477,7 +1640,12 @@ export default function App() {
                         <AlertCircle className="w-6 h-6 text-red-600" />
                       </div>
                       <div className="flex-1">
-                        <p className="font-semibold text-neutral-900">{(item.data as Expense).description}</p>
+                        <p className="font-semibold text-neutral-900 flex items-center gap-2">
+                          {(item.data as Expense).description}
+                          {(item.data as Expense).isDraft && (
+                            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">DRAFT</span>
+                          )}
+                        </p>
                         <p className="text-xs text-neutral-400">{(item.data as Expense).date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {(item.data as Expense).date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
                       </div>
                     </div>
