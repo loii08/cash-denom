@@ -238,6 +238,84 @@ export default function App() {
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
+
+  // Sync offline drafts to Firestore
+  const syncOfflineDrafts = useCallback(async () => {
+    if (!user || !isOnline || syncInProgressRef.current) return;
+    
+    syncInProgressRef.current = true;
+    try {
+      // Sync draft transactions
+      for (const draft of draftTransactions) {
+        try {
+          const serverTimestamp = Date.now();
+          await addDoc(collection(db, 'transactions'), {
+            date: Timestamp.fromDate(draft.date),
+            breakdown: draft.breakdown,
+            total: draft.total,
+            uid: user.uid,
+            serverTimestamp
+          });
+          await logActivity('CREATE', {
+            transactionId: 'synced-draft',
+            total: draft.total,
+            breakdown: draft.breakdown
+          });
+        } catch (error) {
+          console.error('Failed to sync transaction draft:', error);
+        }
+      }
+
+      // Sync draft expenses
+      for (const draft of draftExpenses) {
+        try {
+          const serverTimestamp = Date.now();
+          await addDoc(collection(db, 'expenses'), {
+            date: Timestamp.fromDate(draft.date),
+            amount: draft.amount,
+            description: draft.description,
+            uid: user.uid,
+            serverTimestamp
+          });
+          await logActivity('CREATE', {
+            expenseId: 'synced-draft',
+            amount: draft.amount,
+            description: draft.description
+          });
+        } catch (error) {
+          console.error('Failed to sync expense draft:', error);
+        }
+      }
+
+      // Clear drafts after successful sync
+      if (draftTransactions.length > 0 || draftExpenses.length > 0) {
+        setDraftTransactions([]);
+        setDraftExpenses([]);
+        localStorage.removeItem('draftTransactions');
+        localStorage.removeItem('draftExpenses');
+        addToast('Synced all offline changes', 'success');
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+    } finally {
+      syncInProgressRef.current = false;
+    }
+  }, [user, isOnline, draftTransactions, draftExpenses, addToast]);
+
+  const logActivity = async (action: 'CREATE' | 'UPDATE' | 'DELETE', details: any) => {
+    if (!user) return;
+    const path = 'activityLogs';
+    try {
+      await addDoc(collection(db, path), {
+        action,
+        timestamp: Timestamp.now(),
+        details,
+        uid: user.uid
+      });
+    } catch (error) {
+      console.error("Logging Error:", error);
+    }
+  };
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
@@ -514,6 +592,16 @@ export default function App() {
     return items.sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [transactions, expenses, draftTransactions, draftExpenses, historyFilter]);
 
+  const filteredTotal = useMemo(() => {
+    return filteredHistoryItems.reduce((acc, item) => {
+      if (item.type === 'transaction') {
+        return acc + (item.data as Transaction).total;
+      } else {
+        return acc - (item.data as Expense).amount;
+      }
+    }, 0);
+  }, [filteredHistoryItems]);
+
   const handleQuantityChange = (denom: number, value: string) => {
     const sanitized = sanitizeInput(value);
     const qty = parseInt(sanitized) || 0;
@@ -533,83 +621,6 @@ export default function App() {
     setQuantities(prev => ({ ...prev, [denom]: Math.max(0, qty) }));
   };
 
-  const logActivity = async (action: 'CREATE' | 'UPDATE' | 'DELETE', details: any) => {
-    if (!user) return;
-    const path = 'activityLogs';
-    try {
-      await addDoc(collection(db, path), {
-        action,
-        timestamp: Timestamp.now(),
-        details,
-        uid: user.uid
-      });
-    } catch (error) {
-      console.error("Logging Error:", error);
-    }
-  };
-
-  // Sync offline drafts to Firestore
-  const syncOfflineDrafts = useCallback(async () => {
-    if (!user || !isOnline || syncInProgressRef.current) return;
-    
-    syncInProgressRef.current = true;
-    try {
-      // Sync draft transactions
-      for (const draft of draftTransactions) {
-        try {
-          const serverTimestamp = Date.now();
-          await addDoc(collection(db, 'transactions'), {
-            date: Timestamp.fromDate(draft.date),
-            breakdown: draft.breakdown,
-            total: draft.total,
-            uid: user.uid,
-            serverTimestamp
-          });
-          await logActivity('CREATE', {
-            transactionId: 'synced-draft',
-            total: draft.total,
-            breakdown: draft.breakdown
-          });
-        } catch (error) {
-          console.error('Failed to sync transaction draft:', error);
-        }
-      }
-
-      // Sync draft expenses
-      for (const draft of draftExpenses) {
-        try {
-          const serverTimestamp = Date.now();
-          await addDoc(collection(db, 'expenses'), {
-            date: Timestamp.fromDate(draft.date),
-            amount: draft.amount,
-            description: draft.description,
-            uid: user.uid,
-            serverTimestamp
-          });
-          await logActivity('CREATE', {
-            expenseId: 'synced-draft',
-            amount: draft.amount,
-            description: draft.description
-          });
-        } catch (error) {
-          console.error('Failed to sync expense draft:', error);
-        }
-      }
-
-      // Clear drafts after successful sync
-      if (draftTransactions.length > 0 || draftExpenses.length > 0) {
-        setDraftTransactions([]);
-        setDraftExpenses([]);
-        localStorage.removeItem('draftTransactions');
-        localStorage.removeItem('draftExpenses');
-        addToast('Synced all offline changes', 'success');
-      }
-    } catch (error) {
-      console.error('Sync error:', error);
-    } finally {
-      syncInProgressRef.current = false;
-    }
-  }, [user, isOnline, draftTransactions, draftExpenses, addToast]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -1535,6 +1546,16 @@ export default function App() {
                 >
                   Expenses
                 </button>
+              </div>
+
+              {/* Filtered Total Row */}
+              <div className="bg-white px-4 py-3 rounded-2xl shadow-sm border border-neutral-200 flex items-center justify-between">
+                <span className="text-sm font-medium text-neutral-500">
+                  {historyFilter === 'all' ? 'Total Net' : historyFilter === 'income' ? 'Total Income' : 'Total Expenses'}
+                </span>
+                <span className={`text-lg font-bold ${filteredTotal >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  ₱ {Math.abs(filteredTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
               </div>
 
               {filteredHistoryItems.length === 0 ? (
