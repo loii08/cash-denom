@@ -592,31 +592,47 @@ export default function App() {
   const filteredHistoryItems = useMemo(() => {
     const items: Array<{ type: 'transaction' | 'expense', date: Date, data: Transaction | Expense }> = [];
     
-    // Add transactions
+    // Helper to check if date matches selected date
+    const matchesSelectedDate = (date: Date) => {
+      if (!selectedDate) return true;
+      return date.getDate() === selectedDate.getDate() &&
+             date.getMonth() === selectedDate.getMonth() &&
+             date.getFullYear() === selectedDate.getFullYear();
+    };
+    
+    // Add transactions (already filtered by date in listener, but double-check)
     if (historyFilter === 'all' || historyFilter === 'income') {
       transactions.forEach(tx => {
-        items.push({ type: 'transaction', date: tx.date, data: tx });
+        if (matchesSelectedDate(tx.date)) {
+          items.push({ type: 'transaction', date: tx.date, data: tx });
+        }
       });
       // Add draft transactions
       draftTransactions.forEach(tx => {
-        items.push({ type: 'transaction', date: tx.date, data: tx });
+        if (matchesSelectedDate(tx.date)) {
+          items.push({ type: 'transaction', date: tx.date, data: tx });
+        }
       });
     }
     
-    // Add expenses
+    // Add expenses (filter by date here since expenses listener doesn't filter by date)
     if (historyFilter === 'all' || historyFilter === 'expense') {
       expenses.forEach(exp => {
-        items.push({ type: 'expense', date: exp.date, data: exp });
+        if (matchesSelectedDate(exp.date)) {
+          items.push({ type: 'expense', date: exp.date, data: exp });
+        }
       });
       // Add draft expenses
       draftExpenses.forEach(exp => {
-        items.push({ type: 'expense', date: exp.date, data: exp });
+        if (matchesSelectedDate(exp.date)) {
+          items.push({ type: 'expense', date: exp.date, data: exp });
+        }
       });
     }
     
     // Sort by date descending
     return items.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [transactions, expenses, draftTransactions, draftExpenses, historyFilter]);
+  }, [transactions, expenses, draftTransactions, draftExpenses, historyFilter, selectedDate]);
 
   const filteredTotal = useMemo(() => {
     return filteredHistoryItems.reduce((acc, item) => {
@@ -1915,6 +1931,7 @@ export default function App() {
                           >
                             <div className="px-3 py-2 space-y-1">
                               <div className="h-px bg-neutral-200 mb-2" />
+                              <p className="text-[10px] text-neutral-500 mb-1">by: {user?.displayName || 'User'}</p>
                               {log.details.transactionId ? (
                                 <>
                                   {log.details.originalDate && (
