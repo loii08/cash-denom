@@ -38,17 +38,6 @@ export const getDb = () => {
   return dbInstance;
 };
 
-// Create proxy objects to lazily initialize
-export const auth = new Proxy({}, {
-  get(target, prop) {
-    const instance = getAuth_();
-    return (instance as any)[prop];
-  }
-});
-
-export const db = new Proxy({}, {
-  get(target, prop) {
-    const instance = getDb();
-    return (instance as any)[prop];
-  }
-});
+// Export lazy initialized instances
+export const auth = getAuth_();
+export const db = getDb();
