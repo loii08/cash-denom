@@ -437,7 +437,7 @@ export default function App() {
     const q = query(collection(db, path), ...constraints);
 
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
-      let txs: Transaction[] = snapshot.docs.map(doc => {
+      const txs: Transaction[] = snapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
@@ -449,15 +449,6 @@ export default function App() {
         };
       });
       
-      // Apply client-side date filtering
-      if (selectedDate) {
-        const start = new Date(selectedDate);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(selectedDate);
-        end.setHours(23, 59, 59, 999);
-        txs = txs.filter(tx => tx.date >= start && tx.date <= end);
-      }
-      
       // Sort by date descending (newest first)
       txs.sort((a, b) => b.date.getTime() - a.date.getTime());
       setTransactions(txs);
@@ -466,7 +457,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user, isAuthReady, selectedDate]);
+  }, [user, isAuthReady]);
 
   // Activity Logs Listener
   useEffect(() => {
