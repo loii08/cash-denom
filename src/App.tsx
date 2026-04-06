@@ -544,6 +544,30 @@ export default function App() {
     return transactions.reduce((acc, tx) => acc + tx.total, 0);
   }, [transactions]);
 
+  const incomeStats = useMemo(() => {
+    const allTransactions = [...transactions, ...draftTransactions];
+    if (allTransactions.length === 0) return { count: 0, avg: 0, max: 0, min: 0 };
+    const totals = allTransactions.map(t => t.total);
+    return {
+      count: allTransactions.length,
+      avg: Math.round(totals.reduce((a, b) => a + b, 0) / totals.length),
+      max: Math.max(...totals),
+      min: Math.min(...totals)
+    };
+  }, [transactions, draftTransactions]);
+
+  const expenseStats = useMemo(() => {
+    const allExpenses = [...expenses, ...draftExpenses];
+    if (allExpenses.length === 0) return { count: 0, avg: 0, max: 0, min: 0 };
+    const amounts = allExpenses.map(e => e.amount);
+    return {
+      count: allExpenses.length,
+      avg: Math.round(amounts.reduce((a, b) => a + b, 0) / amounts.length),
+      max: Math.max(...amounts),
+      min: Math.min(...amounts)
+    };
+  }, [expenses, draftExpenses]);
+
   const stats = useMemo(() => {
     if (transactions.length === 0) return { avg: 0, max: 0, min: 0, count: 0 };
     const totals = transactions.map(t => t.total);
@@ -1282,29 +1306,55 @@ export default function App() {
             )}
             
             <AnimatePresence>
-              {showStats && stats.count > 0 && (
+              {showStats && (incomeStats.count > 0 || expenseStats.count > 0) && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="grid grid-cols-4 gap-3 pt-4 border-t border-emerald-400"
+                  className="pt-4 border-t border-emerald-400 space-y-3"
                 >
-                  <div className="text-center">
-                    <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Entries</p>
-                    <p className="text-xl font-bold">{stats.count}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Average</p>
-                    <p className="text-xl font-bold">₱{stats.avg.toLocaleString()}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Max</p>
-                    <p className="text-xl font-bold">₱{stats.max.toLocaleString()}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Min</p>
-                    <p className="text-xl font-bold">₱{stats.min.toLocaleString()}</p>
-                  </div>
+                  {/* Income Stats Row */}
+                  {incomeStats.count > 0 && (
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="text-center">
+                        <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Income</p>
+                        <p className="text-lg font-bold">{incomeStats.count}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Avg</p>
+                        <p className="text-lg font-bold">₱{incomeStats.avg.toLocaleString()}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Max</p>
+                        <p className="text-lg font-bold">₱{incomeStats.max.toLocaleString()}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Min</p>
+                        <p className="text-lg font-bold">₱{incomeStats.min.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  )}
+                  {/* Expense Stats Row */}
+                  {expenseStats.count > 0 && (
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="text-center">
+                        <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Expenses</p>
+                        <p className="text-lg font-bold">{expenseStats.count}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Avg</p>
+                        <p className="text-lg font-bold">₱{expenseStats.avg.toLocaleString()}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Max</p>
+                        <p className="text-lg font-bold">₱{expenseStats.max.toLocaleString()}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-emerald-100 text-xs uppercase font-bold mb-1">Min</p>
+                        <p className="text-lg font-bold">₱{expenseStats.min.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1548,15 +1598,17 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Filtered Total Row */}
-              <div className="bg-white px-4 py-3 rounded-2xl shadow-sm border border-neutral-200 flex items-center justify-between">
-                <span className="text-sm font-medium text-neutral-500">
-                  {historyFilter === 'all' ? 'Total Net' : historyFilter === 'income' ? 'Total Income' : 'Total Expenses'}
-                </span>
-                <span className={`text-lg font-bold ${filteredTotal >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  ₱ {Math.abs(filteredTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
+              {/* Filtered Total Row - only show when date is selected */}
+              {selectedDate && (
+                <div className="bg-white px-4 py-3 rounded-2xl shadow-sm border border-neutral-200 flex items-center justify-between">
+                  <span className="text-sm font-medium text-neutral-500">
+                    {historyFilter === 'all' ? 'Total Net' : historyFilter === 'income' ? 'Total Income' : 'Total Expenses'}
+                  </span>
+                  <span className={`text-lg font-bold ${filteredTotal >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    ₱ {Math.abs(filteredTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
 
               {filteredHistoryItems.length === 0 ? (
                 <div className="bg-white p-12 rounded-3xl text-center border border-neutral-200 border-dashed space-y-4">
