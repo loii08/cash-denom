@@ -28,7 +28,7 @@ const ensureInitialized = () => {
   initialized = true;
 };
 
-export const getAuth_ = () => {
+export const getAuth = () => {
   ensureInitialized();
   return authInstance;
 };
@@ -38,6 +38,20 @@ export const getDb = () => {
   return dbInstance;
 };
 
-// Export lazy initialized instances
-export const auth = getAuth_();
-export const db = getDb();
+// Lazy getters to avoid circular dependencies
+Object.defineProperty(globalThis, '__firebaseAuth', {
+  get() {
+    return getAuth();
+  },
+  configurable: true
+});
+
+Object.defineProperty(globalThis, '__firebaseDb', {
+  get() {
+    return getDb();
+  },
+  configurable: true
+});
+
+export const auth = globalThis.__firebaseAuth as any;
+export const db = globalThis.__firebaseDb as any;
