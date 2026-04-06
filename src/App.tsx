@@ -190,6 +190,8 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
+  const [logsDateFilter, setLogsDateFilter] = useState<Date | null>(new Date()); // Default to today
+  const [showLogsCalendar, setShowLogsCalendar] = useState(false);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseDescription, setExpenseDescription] = useState('');
@@ -1749,99 +1751,201 @@ export default function App() {
               exit={{ opacity: 0, y: -20 }}
               className="space-y-3"
             >
-              {activityLogs.length === 0 ? (
-                <div className="bg-white p-12 rounded-3xl text-center border border-neutral-200 border-dashed space-y-4">
-                  <div className="w-16 h-16 bg-neutral-100 rounded-2xl flex items-center justify-center mx-auto">
-                    <Activity className="w-8 h-8 text-neutral-300" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-neutral-700 mb-1">No activity yet</p>
-                    <p className="text-sm text-neutral-400">Your actions will be logged here</p>
-                  </div>
-                </div>
-              ) : (
-                activityLogs.map((log) => (
-                  <div 
-                    key={log.id} 
-                    className="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden"
-                  >
-                    <button 
-                      onClick={() => setExpandedId(expandedId === log.id ? null : log.id!)}
-                      className="w-full p-5 flex items-center justify-between hover:bg-neutral-50 transition-colors"
+              {/* Logs Date Filter */}
+              <div className="flex items-center justify-between bg-white p-2 rounded-2xl shadow-sm border border-neutral-200">
+                <span className="text-sm font-medium text-neutral-500 px-2">
+                  {logsDateFilter ? logsDateFilter.toLocaleDateString() : 'All Dates'}
+                </span>
+                <div className="flex items-center gap-2">
+                  {logsDateFilter && (
+                    <button
+                      onClick={() => setLogsDateFilter(null)}
+                      className="p-1.5 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+                      title="Show all dates"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                          log.action === 'CREATE' ? 'bg-emerald-50 text-emerald-600' :
-                          log.action === 'UPDATE' ? 'bg-blue-50 text-blue-600' :
-                          'bg-red-50 text-red-600'
-                        }`}>
-                          {log.action === 'CREATE' ? <Plus className="w-6 h-6" /> :
-                           log.action === 'UPDATE' ? <Edit2 className="w-6 h-6" /> :
-                           <Trash2 className="w-6 h-6" />}
-                        </div>
-                        <div className="text-left">
-                          <p className="font-bold text-neutral-900 flex items-center gap-2">
-                            {log.action} {log.details.transactionId ? (
-                              <span className="text-neutral-400 font-normal">₱ {log.details.total?.toLocaleString() || 'Transaction'}</span>
-                            ) : (
-                              <span className="text-neutral-400 font-normal">₱ {log.details.amount?.toLocaleString() || 'Expense'}</span>
-                            )}
-                            {log.hasPendingWrites && (
-                              <RefreshCcw className="w-3 h-3 text-emerald-500 animate-spin" />
-                            )}
-                          </p>
-                          <p className="text-xs text-neutral-500">by: {user?.displayName || 'User'}</p>
-                          <p className="text-xs text-neutral-400">
-                            {log.timestamp.toLocaleDateString()} at {log.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                      </div>
-                      {expandedId === log.id ? <ChevronDown className="w-5 h-5 text-neutral-300" /> : <ChevronRight className="w-5 h-5 text-neutral-300" />}
+                      <X className="w-4 h-4" />
                     </button>
-                    
-                    <AnimatePresence>
-                      {expandedId === log.id && (
-                        <motion.div 
-                          initial={{ height: 0 }}
-                          animate={{ height: 'auto' }}
-                          exit={{ height: 0 }}
-                          className="overflow-hidden bg-neutral-50"
-                        >
-                          <div className="p-5 pt-0 space-y-2">
-                            <div className="h-px bg-neutral-200 mb-4" />
-                            <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">Details</p>
-                            {log.details.transactionId ? (
-                              <>
-                                {log.details.originalDate && (
-                                  <p className="text-xs text-neutral-500 mb-2">Original Date: {new Date(log.details.originalDate).toLocaleDateString()}</p>
-                                )}
-                                <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                                  {log.details.breakdown && DENOMINATIONS.map(d => log.details.breakdown[d] > 0 && (
-                                    <div key={d} className="flex justify-between text-sm">
-                                      <span className="text-neutral-500">₱ {d} × {log.details.breakdown[d]}</span>
-                                      <span className="font-medium text-neutral-700">₱ {(d * log.details.breakdown[d]).toLocaleString()}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <p className="text-sm text-neutral-700 mb-3">💰 {log.details.description}</p>
+                  )}
+                  <button
+                    onClick={() => setShowLogsCalendar(!showLogsCalendar)}
+                    className="p-2 text-neutral-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                    title="Filter by date"
+                  >
+                    <Calendar className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Mini Calendar for Logs */}
+              {showLogsCalendar && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="bg-white p-3 rounded-2xl shadow-sm border border-neutral-200">
+                    <div className="grid grid-cols-7 gap-1">
+                      {Array.from({ length: 7 }, (_, i) => {
+                        const date = new Date();
+                        date.setDate(date.getDate() - 6 + i);
+                        const isSelected = logsDateFilter && 
+                          date.getDate() === logsDateFilter.getDate() && 
+                          date.getMonth() === logsDateFilter.getMonth();
+                        const isToday = new Date().toDateString() === date.toDateString();
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              setLogsDateFilter(date);
+                              setShowLogsCalendar(false);
+                            }}
+                            className={`h-8 rounded-lg text-xs font-medium transition-all
+                              ${isSelected ? 'bg-emerald-600 text-white' : 
+                                isToday ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 
+                                'text-neutral-600 hover:bg-neutral-100'}`}
+                          >
+                            {date.getDate()}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-between mt-2 pt-2 border-t border-neutral-100">
+                      <button
+                        onClick={() => {
+                          const prev = logsDateFilter ? new Date(logsDateFilter) : new Date();
+                          prev.setDate(prev.getDate() - 1);
+                          setLogsDateFilter(prev);
+                        }}
+                        className="text-xs text-neutral-500 hover:text-emerald-600 px-2 py-1"
+                      >
+                        ← Prev
+                      </button>
+                      <button
+                        onClick={() => {
+                          setLogsDateFilter(new Date());
+                          setShowLogsCalendar(false);
+                        }}
+                        className="text-xs text-emerald-600 font-medium px-2 py-1"
+                      >
+                        Today
+                      </button>
+                      <button
+                        onClick={() => {
+                          const next = logsDateFilter ? new Date(logsDateFilter) : new Date();
+                          next.setDate(next.getDate() + 1);
+                          setLogsDateFilter(next);
+                        }}
+                        className="text-xs text-neutral-500 hover:text-emerald-600 px-2 py-1"
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {(() => {
+                // Filter logs by date
+                const filteredLogs = logsDateFilter 
+                  ? activityLogs.filter(log => {
+                      const logDate = new Date(log.timestamp);
+                      return logDate.getDate() === logsDateFilter.getDate() &&
+                             logDate.getMonth() === logsDateFilter.getMonth() &&
+                             logDate.getFullYear() === logsDateFilter.getFullYear();
+                    })
+                  : activityLogs;
+                
+                return filteredLogs.length === 0 ? (
+                  <div className="bg-white p-8 rounded-3xl text-center border border-neutral-200 border-dashed space-y-3">
+                    <div className="w-12 h-12 bg-neutral-100 rounded-xl flex items-center justify-center mx-auto">
+                      <Activity className="w-6 h-6 text-neutral-300" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-neutral-700 mb-1">No activity {logsDateFilter ? 'for this date' : 'yet'}</p>
+                      <p className="text-sm text-neutral-400">Your actions will be logged here</p>
+                    </div>
+                  </div>
+                ) : (
+                  filteredLogs.map((log) => (
+                    <div 
+                      key={log.id} 
+                      className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden"
+                    >
+                      <button 
+                        onClick={() => setExpandedId(expandedId === log.id ? null : log.id!)}
+                        className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-neutral-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            log.action === 'CREATE' ? 'bg-emerald-50 text-emerald-600' :
+                            log.action === 'UPDATE' ? 'bg-blue-50 text-blue-600' :
+                            'bg-red-50 text-red-600'
+                          }`}>
+                            {log.action === 'CREATE' ? <Plus className="w-4 h-4" /> :
+                             log.action === 'UPDATE' ? <Edit2 className="w-4 h-4" /> :
+                             <Trash2 className="w-4 h-4" />}
+                          </div>
+                          <div className="text-left">
+                            <p className="font-semibold text-sm text-neutral-900 flex items-center gap-1.5">
+                              {log.action} {log.details.transactionId ? (
+                                <span className="text-neutral-400 font-normal text-xs">₱ {log.details.total?.toLocaleString() || 'Transaction'}</span>
+                              ) : (
+                                <span className="text-neutral-400 font-normal text-xs">₱ {log.details.amount?.toLocaleString() || 'Expense'}</span>
+                              )}
+                              {log.hasPendingWrites && (
+                                <RefreshCcw className="w-3 h-3 text-emerald-500 animate-spin" />
+                              )}
+                            </p>
+                            <p className="text-[10px] text-neutral-400">
+                              {log.timestamp.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} • {log.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                        {expandedId === log.id ? <ChevronDown className="w-4 h-4 text-neutral-300" /> : <ChevronRight className="w-4 h-4 text-neutral-300" />}
+                      </button>
+                      
+                      <AnimatePresence>
+                        {expandedId === log.id && (
+                          <motion.div 
+                            initial={{ height: 0 }}
+                            animate={{ height: 'auto' }}
+                            exit={{ height: 0 }}
+                            className="overflow-hidden bg-neutral-50"
+                          >
+                            <div className="px-3 py-2 space-y-1">
+                              <div className="h-px bg-neutral-200 mb-2" />
+                              {log.details.transactionId ? (
+                                <>
+                                  {log.details.originalDate && (
+                                    <p className="text-[10px] text-neutral-500 mb-1">Original: {new Date(log.details.originalDate).toLocaleDateString()}</p>
+                                  )}
+                                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                    {log.details.breakdown && DENOMINATIONS.map(d => log.details.breakdown[d] > 0 && (
+                                      <div key={d} className="flex justify-between text-xs">
+                                        <span className="text-neutral-500">₱ {d} × {log.details.breakdown[d]}</span>
+                                        <span className="font-medium text-neutral-700">₱ {(d * log.details.breakdown[d]).toLocaleString()}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </>
+                              ) : (
                                 <div className="space-y-1">
-                                  <div className="flex justify-between text-sm">
+                                  <p className="text-xs text-neutral-700">{log.details.description}</p>
+                                  <div className="flex justify-between text-xs">
                                     <span className="text-neutral-500">Amount:</span>
                                     <span className="font-medium text-red-600">₱ {log.details.amount?.toLocaleString()}</span>
                                   </div>
                                 </div>
-                              </>
-                            )}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                ))
-              )}
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ))
+                );
+              })()}
             </motion.div>
           )}
           {/* Add Expense Modal */}
