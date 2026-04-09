@@ -1377,7 +1377,7 @@ export default function App() {
           className="bg-emerald-600 p-8 rounded-3xl text-white shadow-lg shadow-emerald-200 relative overflow-hidden cursor-pointer hover:shadow-xl transition-shadow"
           onClick={() => setShowStats(!showStats)}
         >
-          <div className="relative z-10">
+          <div className="relative">
             <p className="text-emerald-100 text-sm font-medium uppercase tracking-wider mb-1 flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               {totalExpenses > 0 ? 'NET Savings' : 'Total Savings'}
@@ -1447,7 +1447,7 @@ export default function App() {
               )}
             </AnimatePresence>
           </div>
-          <div className="absolute -right-10 -bottom-10 opacity-10">
+          <div className="absolute -right-10 -bottom-10 opacity-10 -z-10">
             <PhilippinePeso className="w-48 h-48" />
           </div>
         </motion.div>
