@@ -20,16 +20,14 @@ service cloud.firestore {
     return data.date is timestamp &&
            data.breakdown is map &&
            data.total is number &&
-           data.uid is string &&
-           data.uid == request.auth.uid;
+           data.uid is string;
   }
 
   function isValidActivityLog(data) {
     return data.action in ['CREATE', 'UPDATE', 'DELETE'] &&
            data.timestamp is timestamp &&
            data.details is map &&
-           data.uid is string &&
-           data.uid == request.auth.uid;
+           data.uid is string;
   }
 
   function isValidExpense(data) {
@@ -37,8 +35,15 @@ service cloud.firestore {
            data.amount is number &&
            data.amount > 0 &&
            data.description is string &&
-           data.uid is string &&
-           data.uid == request.auth.uid;
+           data.uid is string;
+  }
+
+  function isValidSharedAccess(data) {
+    return data.ownerId is string &&
+           data.sharedWithId is string &&
+           data.sharedWithEmail is string &&
+           data.role in ['owner', 'editor', 'viewer'] &&
+           data.createdAt is timestamp;
   }
 
   function isAdmin() {
@@ -47,37 +52,101 @@ service cloud.firestore {
       request.auth.token.email_verified == true;
   }
 
+  // Get the ownerId for a given document
+  function getDocOwnerId(docId, collection) {
+    return get(/databases/$(database)/documents/$(collection)/$(docId)).data.uid;
+  }
+
+  // Check if current user has shared access to owner's data
+  function hasSharedAccess(ownerId, requiredRole) {
+    return isAuthenticated() &&
+      exists(/databases/$(database)/documents/sharedAccess/$(ownerId + '_' + request.auth.uid)) &&
+      get(/databases/$(database)/documents/sharedAccess/$(ownerId + '_' + request.auth.uid)).data.sharedWithId == request.auth.uid &&
+      (requiredRole == 'viewer' ||
+       (requiredRole == 'editor' && get(/databases/$(database)/documents/sharedAccess/$(ownerId + '_' + request.auth.uid)).data.role in ['editor', 'owner']) ||
+       (requiredRole == 'owner' && get(/databases/$(database)/documents/sharedAccess/$(ownerId + '_' + request.auth.uid)).data.role == 'owner'));
+  }
+
+  // Check if user can read a document (owner or shared viewer/editor)
+  function canReadDocument(docOwnerId) {
+    return isAuthenticated() && (request.auth.uid == docOwnerId || hasSharedAccess(docOwnerId, 'viewer'));
+  }
+
+  // Check if user can modify a document (owner or shared editor)
+  function canModifyDocument(docOwnerId) {
+    return isAuthenticated() && (request.auth.uid == docOwnerId || hasSharedAccess(docOwnerId, 'editor'));
+  }
+
+  // Check if user is owner of the data
+  function isDataOwner(docOwnerId) {
+    return isAuthenticated() && request.auth.uid == docOwnerId;
+  }
+
   // ===============================================================
   // Rules
   // ===============================================================
   
   match /databases/{database}/documents {
+    // Transactions collection
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() && request.query.where[0].value == request.auth.uid;
+      allow read: if isAuthenticated() && canReadDocument(resource.data.uid);
       allow list: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidTransaction(request.resource.data) && uidUnchanged();
-      allow update: if isAuthenticated() && isValidTransaction(request.resource.data) && (isDocOwner() || isAdmin()) && request.resource.data.uid == resource.data.uid;
-      allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
+      allow create: if isAuthenticated() && isValidTransaction(request.resource.data) && 
+                    (request.resource.data.uid == request.auth.uid || canModifyDocument(request.resource.data.uid));
+      allow update: if isAuthenticated() && isValidTransaction(request.resource.data) && 
+                    canModifyDocument(resource.data.uid) && 
+                    request.resource.data.uid == resource.data.uid;
+      allow delete: if isAuthenticated() && canModifyDocument(resource.data.uid);
     }
 
+    // Activity Logs collection
     match /activityLogs/{logId} {
-      allow read: if isAuthenticated() && request.query.where[0].value == request.auth.uid;
+      allow read: if isAuthenticated() && canReadDocument(resource.data.uid);
       allow list: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidActivityLog(request.resource.data) && uidUnchanged();
+      allow create: if isAuthenticated() && isValidActivityLog(request.resource.data) && 
+                    (request.resource.data.uid == request.auth.uid || canModifyDocument(request.resource.data.uid));
       allow update, delete: if false;
     }
 
+    // Users collection
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow create, update: if isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Expenses collection
     match /expenses/{expenseId} {
-      allow read: if isAuthenticated() && request.query.where[0].value == request.auth.uid;
+      allow read: if isAuthenticated() && canReadDocument(resource.data.uid);
       allow list: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidExpense(request.resource.data);
-      allow update: if isAuthenticated() && isValidExpense(request.resource.data) && (isDocOwner() || isAdmin()) && request.resource.data.uid == resource.data.uid;
-      allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
+      allow create: if isAuthenticated() && isValidExpense(request.resource.data) &&
+                    (request.resource.data.uid == request.auth.uid || canModifyDocument(request.resource.data.uid));
+      allow update: if isAuthenticated() && isValidExpense(request.resource.data) && 
+                    canModifyDocument(resource.data.uid) && 
+                    request.resource.data.uid == resource.data.uid;
+      allow delete: if isAuthenticated() && canModifyDocument(resource.data.uid);
+    }
+
+    // Shared Access collection - manages sharing permissions
+    match /sharedAccess/{accessId} {
+      allow read: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid || 
+        resource.data.sharedWithId == request.auth.uid ||
+        isAdmin()
+      );
+      allow list: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid || 
+        resource.data.sharedWithId == request.auth.uid ||
+        isAdmin()
+      );
+      // Only owner can create sharing records
+      allow create: if isAuthenticated() && isValidSharedAccess(request.resource.data) && 
+                    request.resource.data.ownerId == request.auth.uid &&
+                    request.resource.data.sharedWithId != request.auth.uid;
+      // Only owner can update or delete sharing records
+      allow update: if isAuthenticated() && isValidSharedAccess(request.resource.data) &&
+                    resource.data.ownerId == request.auth.uid &&
+                    request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
 
     match /test/connection {

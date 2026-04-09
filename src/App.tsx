@@ -23,13 +23,16 @@ import {
 import { db, auth } from './firebase';
 import { Transaction, Breakdown, ActivityLog, Expense, DENOMINATIONS } from './types';
 import { APP_VERSION } from './constants';
-import { 
-  Plus, 
-  History, 
-  Wallet, 
-  LogOut, 
-  LogIn, 
-  ChevronRight, 
+import { usePermissions } from './hooks/usePermissions';
+import { SharingManager } from './components/SharingManager';
+import type { UserRole } from './types';
+import {
+  Plus,
+  History,
+  Wallet,
+  LogOut,
+  LogIn,
+  ChevronRight,
   ChevronDown,
   ChevronLeft,
   Calendar,
@@ -49,7 +52,9 @@ import {
   Eye,
   EyeOff,
   Copy,
-  BarChart3
+  BarChart3,
+  Shield,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -164,6 +169,20 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+
+  // Permissions hook
+  const {
+    sharedAccessList,
+    currentRole,
+    permissions,
+    shareAccess,
+    revokeAccess,
+    updateRole,
+    getDataOwnerId,
+    hasActiveSharing,
+    isLoading: isLoadingPermissions,
+  } = usePermissions(user);
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -424,7 +443,7 @@ export default function App() {
     testConnection();
   }, []);
 
-  // Transactions Listener
+  // Transactions Listener - fetches data for current user or shared owner
   useEffect(() => {
     if (!user || !isAuthReady) {
       setTransactions([]);
@@ -432,7 +451,8 @@ export default function App() {
     }
 
     const path = 'transactions';
-    const constraints = [where('uid', '==', user.uid)];
+    const dataOwnerId = getDataOwnerId();
+    const constraints = [where('uid', '==', dataOwnerId)];
 
     const q = query(collection(db, path), ...constraints);
 
@@ -448,7 +468,7 @@ export default function App() {
           hasPendingWrites: doc.metadata.hasPendingWrites
         };
       });
-      
+
       // Sort by date descending (newest first)
       txs.sort((a, b) => b.date.getTime() - a.date.getTime());
       setTransactions(txs);
@@ -457,9 +477,9 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user, isAuthReady]);
+  }, [user, isAuthReady, getDataOwnerId, sharedAccessList]);
 
-  // Activity Logs Listener
+  // Activity Logs Listener - fetches logs for current user or shared owner
   useEffect(() => {
     if (!user || !isAuthReady) {
       setActivityLogs([]);
@@ -467,9 +487,10 @@ export default function App() {
     }
 
     const path = 'activityLogs';
+    const dataOwnerId = getDataOwnerId();
     const q = query(
       collection(db, path),
-      where('uid', '==', user.uid)
+      where('uid', '==', dataOwnerId)
     );
 
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
@@ -492,9 +513,9 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user, isAuthReady]);
+  }, [user, isAuthReady, getDataOwnerId, sharedAccessList]);
 
-  // Expenses Listener
+  // Expenses Listener - fetches expenses for current user or shared owner
   useEffect(() => {
     if (!user || !isAuthReady) {
       setExpenses([]);
@@ -502,9 +523,10 @@ export default function App() {
     }
 
     const path = 'expenses';
+    const dataOwnerId = getDataOwnerId();
     const q = query(
       collection(db, path),
-      where('uid', '==', user.uid)
+      where('uid', '==', dataOwnerId)
     );
 
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
@@ -527,7 +549,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user, isAuthReady]);
+  }, [user, isAuthReady, getDataOwnerId, sharedAccessList]);
 
   const currentTotal = useMemo(() => {
     return DENOMINATIONS.reduce((acc, d) => acc + (d * (quantities[d] || 0)), 0);
@@ -656,7 +678,10 @@ export default function App() {
 
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !permissions.canCreate) {
+      addToast('You do not have permission to add transactions', 'error');
+      return;
+    }
     if (currentTotal === 0) {
       addToast('Please enter at least one denomination', 'warning');
       return;
@@ -672,17 +697,24 @@ export default function App() {
 
     setIsSaving(true);
     const path = 'transactions';
+    // Use the data owner ID (current user or shared owner) for saving
+    const dataOwnerId = getDataOwnerId() || user.uid;
     try {
       if (editingId) {
+        // Check if user can edit
+        if (!permissions.canEdit) {
+          addToast('You do not have permission to edit transactions', 'error');
+          return;
+        }
         const docRef = doc(db, path, editingId);
         await updateDoc(docRef, {
           breakdown: quantities,
           total: currentTotal
         });
-        await logActivity('UPDATE', { 
-          transactionId: editingId, 
-          total: currentTotal, 
-          breakdown: quantities 
+        await logActivity('UPDATE', {
+          transactionId: editingId,
+          total: currentTotal,
+          breakdown: quantities
         });
         setEditingId(null);
         addToast('Transaction updated successfully', 'success');
@@ -693,12 +725,12 @@ export default function App() {
             date: Timestamp.now(),
             breakdown: quantities,
             total: currentTotal,
-            uid: user.uid
+            uid: dataOwnerId
           });
-          await logActivity('CREATE', { 
-            transactionId: docRef.id, 
-            total: currentTotal, 
-            breakdown: quantities 
+          await logActivity('CREATE', {
+            transactionId: docRef.id,
+            total: currentTotal,
+            breakdown: quantities
           });
           addToast(`Saved ₱${currentTotal.toLocaleString()}`, 'success');
         } else {
@@ -708,7 +740,7 @@ export default function App() {
             date: new Date(),
             breakdown: quantities,
             total: currentTotal,
-            uid: user.uid,
+            uid: dataOwnerId,
             isDraft: true
           };
           const updated = [newDraft, ...draftTransactions];
@@ -730,14 +762,21 @@ export default function App() {
 
   const handleDelete = async () => {
     if (!user || !txToDelete || !txToDelete.id) return;
-    
+
+    // Check permissions
+    if (!permissions.canDelete) {
+      addToast('You do not have permission to delete transactions', 'error');
+      setTxToDelete(null);
+      return;
+    }
+
     setIsDeleting(true);
     const path = 'transactions';
     try {
       await deleteDoc(doc(db, path, txToDelete.id));
-      await logActivity('DELETE', { 
-        transactionId: txToDelete.id, 
-        total: txToDelete.total, 
+      await logActivity('DELETE', {
+        transactionId: txToDelete.id,
+        total: txToDelete.total,
         breakdown: txToDelete.breakdown,
         originalDate: txToDelete.date
       });
@@ -752,6 +791,11 @@ export default function App() {
   };
 
   const startEditing = (tx: Transaction) => {
+    // Check if user can edit
+    if (!permissions.canEdit) {
+      addToast('You do not have permission to edit transactions', 'error');
+      return;
+    }
     setEditingId(tx.id!);
     setQuantities(tx.breakdown);
     setActiveTab('new');
@@ -763,7 +807,10 @@ export default function App() {
   };
 
   const handleSaveExpense = async () => {
-    if (!user) return;
+    if (!user || !permissions.canCreate) {
+      addToast('You do not have permission to add expenses', 'error');
+      return;
+    }
     if (!expenseAmount || !expenseDescription) {
       addToast('Please enter both amount and description', 'warning');
       return;
@@ -777,18 +824,20 @@ export default function App() {
 
     setIsExpenseSaving(true);
     const path = 'expenses';
+    // Use the data owner ID (current user or shared owner) for saving
+    const dataOwnerId = getDataOwnerId() || user.uid;
     try {
       if (isOnline) {
         const docRef = await addDoc(collection(db, path), {
           date: Timestamp.now(),
           amount,
           description: expenseDescription,
-          uid: user.uid
+          uid: dataOwnerId
         });
-        await logActivity('CREATE', { 
-          expenseId: docRef.id, 
-          amount, 
-          description: expenseDescription 
+        await logActivity('CREATE', {
+          expenseId: docRef.id,
+          amount,
+          description: expenseDescription
         });
         addToast(`Expense recorded ₱${amount.toLocaleString()}`, 'success');
       } else {
@@ -798,7 +847,7 @@ export default function App() {
           date: new Date(),
           amount,
           description: expenseDescription,
-          uid: user.uid,
+          uid: dataOwnerId,
           isDraft: true
         };
         const updated = [newDraft, ...draftExpenses];
@@ -817,7 +866,7 @@ export default function App() {
           date: new Date(),
           amount,
           description: expenseDescription,
-          uid: user.uid,
+          uid: dataOwnerId,
           isDraft: true
         };
         const updated = [newDraft, ...draftExpenses];
@@ -835,14 +884,21 @@ export default function App() {
 
   const handleDeleteExpense = async () => {
     if (!user || !expenseToDelete || !expenseToDelete.id) return;
-    
+
+    // Check permissions
+    if (!permissions.canDelete) {
+      addToast('You do not have permission to delete expenses', 'error');
+      setExpenseToDelete(null);
+      return;
+    }
+
     setIsDeleting(true);
     const path = 'expenses';
     try {
       await deleteDoc(doc(db, path, expenseToDelete.id));
-      await logActivity('DELETE', { 
-        expenseId: expenseToDelete.id, 
-        amount: expenseToDelete.amount, 
+      await logActivity('DELETE', {
+        expenseId: expenseToDelete.id,
+        amount: expenseToDelete.amount,
         description: expenseToDelete.description
       });
       setExpenseToDelete(null);
@@ -1255,7 +1311,7 @@ export default function App() {
               </div>
             )}
             {showInstallPrompt && (
-              <button 
+              <button
                 onClick={handleInstall}
                 className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold border border-emerald-200 hover:bg-emerald-100 transition-colors flex items-center gap-1.5"
                 title="Install Cash Tracker app"
@@ -1264,7 +1320,30 @@ export default function App() {
                 Install
               </button>
             )}
-            <button 
+            {/* Role Badge */}
+            <div className={`px-3 py-1.5 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
+              currentRole === 'owner'
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : currentRole === 'editor'
+                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            }`}>
+              {currentRole === 'owner' && <Shield className="w-3 h-3" />}
+              {currentRole === 'editor' && <Edit2 className="w-3 h-3" />}
+              {currentRole === 'viewer' && <Eye className="w-3 h-3" />}
+              {currentRole.charAt(0).toUpperCase() + currentRole.slice(1)}
+            </div>
+            {/* Sharing Manager - only for owners */}
+            {permissions.canShare && (
+              <SharingManager
+                sharedAccessList={sharedAccessList}
+                onShareAccess={shareAccess}
+                onRevokeAccess={revokeAccess}
+                onUpdateRole={updateRole}
+                currentUserEmail={user?.email || null}
+              />
+            )}
+            <button
               onClick={() => setShowUserProfile(!showUserProfile)}
               className="p-2 text-neutral-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors"
               title="User profile"
@@ -1275,7 +1354,7 @@ export default function App() {
                 <Wallet className="w-5 h-5" />
               )}
             </button>
-            <button 
+            <button
               onClick={handleLogout}
               className="p-2 text-neutral-400 hover:text-neutral-600 rounded-lg hover:bg-neutral-100 transition-colors"
               title="Sign out"
@@ -1436,20 +1515,22 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* FAB Button */}
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setShowFabMenu(!showFabMenu)}
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 sm:w-16 sm:h-16 bg-emerald-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
-        >
-          <motion.div
-            animate={{ rotate: showFabMenu ? 45 : 0 }}
-            transition={{ duration: 0.2 }}
+        {/* FAB Button - hidden for viewers */}
+        {permissions.canCreate && (
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowFabMenu(!showFabMenu)}
+            className="fixed bottom-6 right-6 z-50 w-14 h-14 sm:w-16 sm:h-16 bg-emerald-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
           >
-            <Plus className="w-6 h-6 sm:w-7 sm:h-7" />
-          </motion.div>
-        </motion.button>
+            <motion.div
+              animate={{ rotate: showFabMenu ? 45 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Plus className="w-6 h-6 sm:w-7 sm:h-7" />
+            </motion.div>
+          </motion.button>
+        )}
         {/* New Entry Modal */}
         <AnimatePresence>
           {fabMode === 'transaction' && (
@@ -1674,22 +1755,25 @@ export default function App() {
                         </div>
                         {expandedId === (item.data as Transaction).id ? <ChevronDown className="w-5 h-5 text-neutral-300" /> : <ChevronRight className="w-5 h-5 text-neutral-300" />}
                       </button>
-                      <div className="flex pr-4 gap-2">
-                        <button 
-                          onClick={() => startEditing(item.data as Transaction)}
-                          className="p-2 text-neutral-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => setTxToDelete(item.data as Transaction)}
-                          className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {/* Edit/Delete buttons - hidden for viewers */}
+                      {permissions.canEdit && (
+                        <div className="flex pr-4 gap-2">
+                          <button
+                            onClick={() => startEditing(item.data as Transaction)}
+                            className="p-2 text-neutral-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setTxToDelete(item.data as Transaction)}
+                            className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     
                     <AnimatePresence>
@@ -1737,13 +1821,16 @@ export default function App() {
                     </div>
                     <div className="flex items-center gap-3">
                       <p className="font-bold text-red-600">₱ {(item.data as Expense).amount.toLocaleString()}</p>
-                      <button 
-                        onClick={() => setExpenseToDelete(item.data as Expense)}
-                        className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {/* Delete button - hidden for viewers */}
+                      {permissions.canDelete && (
+                        <button
+                          onClick={() => setExpenseToDelete(item.data as Expense)}
+                          className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   )

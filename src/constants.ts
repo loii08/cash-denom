@@ -1,8 +1,9 @@
 // App version - update this with each release
-export const APP_VERSION = '1.0.9';
+export const APP_VERSION = '1.1.0';
 
 // Release notes
 export const VERSION_NOTES: Record<string, string> = {
+  '1.1.0': 'Added role-based access control: Owner, Editor, and Viewer roles with sharing capabilities',
   '1.0.9': 'Fixed NET SAVINGS to remain constant regardless of date filter',
   '1.0.8': 'Fixed expense date filtering bug; Added user name to log expanded details; Net Savings stays fixed',
   '1.0.7': 'Logs tab: compact display, calendar date filter, default to today',
