@@ -27,6 +27,7 @@ import { useWallets } from './hooks/useWallets';
 import { SharingManager } from './components/SharingManager';
 import { NotificationCenter } from './components/NotificationCenter';
 import { WalletSelector } from './components/WalletSelector';
+import { runMigration, type MigrationResult } from './utils/migrateData';
 import type { UserRole } from './types';
 import {
   Plus,
@@ -227,6 +228,8 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState<string | null>(null);
   const [logsDateFilter, setLogsDateFilter] = useState<Date | null>(new Date()); // Default to today
   const [showLogsCalendar, setShowLogsCalendar] = useState(false);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -412,10 +415,24 @@ export default function App() {
 
   // Auth Listener
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       setIsAuthReady(true);
       if (user) {
+        // Run migration for existing users
+        setIsMigrating(true);
+        setMigrationStatus('Checking your data...');
+        try {
+          const result = await runMigration(user, (msg) => setMigrationStatus(msg));
+          if (result.success && result.transactionsMigrated > 0) {
+            addToast(`Migrated ${result.transactionsMigrated} transactions to new wallet system!`, 'success');
+          }
+        } catch (error) {
+          console.error('Migration error:', error);
+        } finally {
+          setIsMigrating(false);
+          setMigrationStatus(null);
+        }
         const path = 'users';
         const userDoc = doc(db, path, user.uid);
         setDoc(userDoc, {
@@ -1219,14 +1236,17 @@ export default function App() {
     );
   };
 
-  if (!isAuthReady) {
+  if (!isAuthReady || isMigrating) {
     return (
-      <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
+      <div className="min-h-screen bg-neutral-100 flex flex-col items-center justify-center gap-4">
         <motion.div 
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
           className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full"
         />
+        {isMigrating && migrationStatus && (
+          <p className="text-neutral-600 text-sm font-medium">{migrationStatus}</p>
+        )}
       </div>
     );
   }
@@ -1412,6 +1432,92 @@ export default function App() {
         <DeleteModal />
         <ExpenseDeleteModal />
         <UserProfile />
+        
+        {/* Sharing Manager Modal */}
+        {showSharingModal && walletToShare && (
+          <SharingManager
+            walletName={walletToShare.name}
+            members={walletToShare.members || []}
+            onShareWallet={(email, role) => shareWallet(walletToShare.id, email, role)}
+            onRevokeAccess={(memberId) => removeMember(walletToShare.id, memberId)}
+            onUpdateRole={(memberId, role) => updateMemberRole(walletToShare.id, memberId, role)}
+            currentUserEmail={user?.email || null}
+            isOpen={showSharingModal}
+            onClose={() => {
+              setShowSharingModal(false);
+              setWalletToShare(null);
+            }}
+          />
+        )}
+        
+        {/* Create Wallet Modal */}
+        {showCreateWalletModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
+            >
+              <div className="p-6">
+                <h3 className="text-xl font-bold text-neutral-900 mb-4">Create New Wallet</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Wallet Name</label>
+                    <input
+                      type="text"
+                      value={newWalletName}
+                      onChange={(e) => setNewWalletName(e.target.value)}
+                      placeholder="e.g., Personal Savings, Business Account"
+                      className="w-full px-4 py-2 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Description (optional)</label>
+                    <input
+                      type="text"
+                      value={newWalletDescription}
+                      onChange={(e) => setNewWalletDescription(e.target.value)}
+                      placeholder="e.g., For daily expenses"
+                      className="w-full px-4 py-2 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 p-4 bg-neutral-50">
+                <button
+                  onClick={() => {
+                    setShowCreateWalletModal(false);
+                    setNewWalletName('');
+                    setNewWalletDescription('');
+                  }}
+                  className="flex-1 py-2 font-medium text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!newWalletName.trim()) {
+                      addToast('Please enter a wallet name', 'warning');
+                      return;
+                    }
+                    try {
+                      await createWallet(newWalletName.trim(), newWalletDescription.trim());
+                      setShowCreateWalletModal(false);
+                      setNewWalletName('');
+                      setNewWalletDescription('');
+                      addToast('Wallet created successfully', 'success');
+                    } catch (error) {
+                      addToast('Failed to create wallet', 'error');
+                    }
+                  }}
+                  className="flex-1 py-2 font-medium bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl transition-colors"
+                >
+                  Create
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
         
         {/* Total Savings Banner with Stats */}
         <motion.div 
