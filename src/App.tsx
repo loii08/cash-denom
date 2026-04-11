@@ -1123,12 +1123,20 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <button 
-              onClick={() => setShowUserProfile(false)}
-              className="w-full py-3 font-bold text-neutral-900 hover:bg-neutral-100 rounded-xl transition-all"
-            >
-              Close
-            </button>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowUserProfile(false)}
+                className="flex-1 py-3 font-bold text-neutral-900 hover:bg-neutral-100 rounded-xl transition-all"
+              >
+                Close
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="flex-1 py-3 font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -1396,13 +1404,6 @@ export default function App() {
               ) : (
                 <Wallet className="w-5 h-5" />
               )}
-            </button>
-            <button
-              onClick={handleLogout}
-              className="p-2 text-neutral-400 hover:text-neutral-600 rounded-lg hover:bg-neutral-100 transition-colors"
-              title="Sign out"
-            >
-              <LogOut className="w-5 h-5" />
             </button>
           </div>
         </div>
