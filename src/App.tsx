@@ -27,7 +27,6 @@ import { useWallets } from './hooks/useWallets';
 import { SharingManager } from './components/SharingManager';
 import { NotificationCenter } from './components/NotificationCenter';
 import { WalletSelector } from './components/WalletSelector';
-import { runMigration, type MigrationResult } from './utils/migrateData';
 import type { UserRole } from './types';
 import {
   Plus,
@@ -228,8 +227,6 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
-  const [isMigrating, setIsMigrating] = useState(false);
-  const [migrationStatus, setMigrationStatus] = useState<string | null>(null);
   const [logsDateFilter, setLogsDateFilter] = useState<Date | null>(new Date()); // Default to today
   const [showLogsCalendar, setShowLogsCalendar] = useState(false);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -415,24 +412,10 @@ export default function App() {
 
   // Auth Listener
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setIsAuthReady(true);
       if (user) {
-        // Run migration for existing users
-        setIsMigrating(true);
-        setMigrationStatus('Checking your data...');
-        try {
-          const result = await runMigration(user, (msg) => setMigrationStatus(msg));
-          if (result.success && result.transactionsMigrated > 0) {
-            addToast(`Migrated ${result.transactionsMigrated} transactions to new wallet system!`, 'success');
-          }
-        } catch (error) {
-          console.error('Migration error:', error);
-        } finally {
-          setIsMigrating(false);
-          setMigrationStatus(null);
-        }
         const path = 'users';
         const userDoc = doc(db, path, user.uid);
         setDoc(userDoc, {
@@ -1236,17 +1219,14 @@ export default function App() {
     );
   };
 
-  if (!isAuthReady || isMigrating) {
+  if (!isAuthReady) {
     return (
-      <div className="min-h-screen bg-neutral-100 flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
         <motion.div 
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
           className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full"
         />
-        {isMigrating && migrationStatus && (
-          <p className="text-neutral-600 text-sm font-medium">{migrationStatus}</p>
-        )}
       </div>
     );
   }

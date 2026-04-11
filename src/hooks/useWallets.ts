@@ -20,12 +20,12 @@ export function useWallets(user: User | null) {
   useEffect(() => {
     if (!user) {
       setWallets([]);
+      setSelectedWalletId(null);
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    const batch = writeBatch(db);
 
     // Query 1: Wallets where user is owner
     const ownedQuery = query(
@@ -134,6 +134,29 @@ export function useWallets(user: User | null) {
       unsubWalletMembers();
     };
   }, [user]);
+
+  // Auto-select default wallet when wallets load
+  useEffect(() => {
+    if (wallets.length > 0 && !selectedWalletId) {
+      // First try to find the default wallet
+      const defaultWallet = wallets.find(w => w.isDefault && w.ownerId === user?.uid);
+      if (defaultWallet) {
+        setSelectedWalletId(defaultWallet.id);
+      } else {
+        // Otherwise select the first owned wallet
+        const firstOwned = wallets.find(w => w.ownerId === user?.uid);
+        if (firstOwned) {
+          setSelectedWalletId(firstOwned.id);
+        } else {
+          // Or the first shared wallet with accepted status
+          const firstShared = wallets.find(w => w.myStatus === 'accepted');
+          if (firstShared) {
+            setSelectedWalletId(firstShared.id);
+          }
+        }
+      }
+    }
+  }, [wallets, selectedWalletId, user]);
 
   // Create a new wallet
   const createWallet = useCallback(async (name: string, description?: string): Promise<string | null> => {
@@ -406,10 +429,25 @@ export function useWallets(user: User | null) {
     }
   }, [user, wallets]);
 
-  // Selected wallet object
+  // Selected wallet object - always returns a wallet (selected, default, or first)
   const selectedWallet = useMemo(() => {
-    return wallets.find(w => w.id === selectedWalletId) || wallets[0] || null;
-  }, [wallets, selectedWalletId]);
+    // If a wallet is explicitly selected, use it
+    if (selectedWalletId) {
+      const found = wallets.find(w => w.id === selectedWalletId);
+      if (found) return found;
+    }
+    // Otherwise, find the default wallet (owned by current user)
+    const defaultWallet = wallets.find(w => w.isDefault && w.ownerId === user?.uid);
+    if (defaultWallet) return defaultWallet;
+    // Or the first owned wallet
+    const firstOwned = wallets.find(w => w.ownerId === user?.uid);
+    if (firstOwned) return firstOwned;
+    // Or the first shared wallet with accepted status
+    const firstShared = wallets.find(w => w.myStatus === 'accepted');
+    if (firstShared) return firstShared;
+    // Fallback to first wallet
+    return wallets[0] || null;
+  }, [wallets, selectedWalletId, user]);
 
   // Check permissions for selected wallet
   const permissions = useMemo(() => {
