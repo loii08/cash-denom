@@ -13,18 +13,17 @@ import {
   AlertCircle,
   UserPlus,
 } from 'lucide-react';
-import type { SharedAccess, UserRole } from '../types';
+import type { WalletMember, UserRole, ShareStatus } from '../types';
 
 interface SharingManagerProps {
-  sharedAccessList: SharedAccess[];
-  onShareAccess: (
-    email: string,
-    role: UserRole,
-    userInfo?: { uid: string; name: string | null; photoURL: string | null }
-  ) => Promise<void>;
-  onRevokeAccess: (accessId: string) => Promise<void>;
-  onUpdateRole: (accessId: string, role: UserRole) => Promise<void>;
+  walletName: string;
+  members: WalletMember[];
+  onShareWallet: (email: string, role: UserRole) => Promise<void>;
+  onRevokeAccess: (memberId: string) => Promise<void>;
+  onUpdateRole: (memberId: string, role: UserRole) => Promise<void>;
   currentUserEmail: string | null;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 const roleConfig: Record<
@@ -51,14 +50,22 @@ const roleConfig: Record<
   },
 };
 
+const statusConfig: Record<ShareStatus, { label: string; color: string; bg: string }> = {
+  pending: { label: 'Pending', color: 'text-amber-600', bg: 'bg-amber-50' },
+  accepted: { label: 'Active', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  declined: { label: 'Declined', color: 'text-red-600', bg: 'bg-red-50' },
+};
+
 export function SharingManager({
-  sharedAccessList,
-  onShareAccess,
+  walletName,
+  members,
+  onShareWallet,
   onRevokeAccess,
   onUpdateRole,
   currentUserEmail,
+  isOpen,
+  onClose,
 }: SharingManagerProps) {
-  const [isOpen, setIsOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('viewer');
   const [isSharing, setIsSharing] = useState(false);
@@ -81,11 +88,21 @@ export function SharingManager({
       return;
     }
 
+    // Check if already shared
+    const alreadyShared = members.some(m => 
+      m.userEmail.toLowerCase() === email.toLowerCase().trim() && 
+      m.status !== 'declined'
+    );
+    if (alreadyShared) {
+      setError('This user already has access or has a pending invitation');
+      return;
+    }
+
     setIsSharing(true);
     setError(null);
 
     try {
-      await onShareAccess(email.trim(), selectedRole);
+      await onShareWallet(email.trim(), selectedRole);
       setEmail('');
       setSelectedRole('viewer');
     } catch (err) {
@@ -124,21 +141,11 @@ export function SharingManager({
     }
   };
 
-  // Filter only the access records where current user is the owner
-  const mySharedUsers = sharedAccessList.filter(
-    (access) => access.ownerId !== access.sharedWithId
-  );
+  // Filter out the owner (members with userId matching owner should not appear)
+  const sharedMembers = members.filter(m => m.status !== 'declined');
 
   return (
     <>
-      {/* Share Button */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className="p-2 text-neutral-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-        title="Manage sharing"
-      >
-        <Share2 className="w-5 h-5" />
-      </button>
 
       {/* Modal */}
       <AnimatePresence>
@@ -148,7 +155,7 @@ export function SharingManager({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsOpen(false)}
+              onClick={onClose}
               className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
             />
 
@@ -166,14 +173,14 @@ export function SharingManager({
                       <Share2 className="w-5 h-5 text-emerald-600" />
                     </div>
                     <div>
-                      <h2 className="font-bold text-xl text-neutral-900">Share Access</h2>
+                      <h2 className="font-bold text-xl text-neutral-900">Share "{walletName}"</h2>
                       <p className="text-sm text-neutral-500">
-                        Manage who can view or edit your cash tracker
+                        Manage who can view or edit this wallet
                       </p>
                     </div>
                   </div>
                   <button
-                    onClick={() => setIsOpen(false)}
+                    onClick={onClose}
                     className="p-2 hover:bg-neutral-100 rounded-xl transition-colors"
                   >
                     <X className="w-5 h-5 text-neutral-500" />
@@ -268,10 +275,10 @@ export function SharingManager({
                   {/* Shared Users List */}
                   <div className="space-y-3">
                     <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-wider">
-                      Shared With ({mySharedUsers.length})
+                      Shared With ({sharedMembers.length})
                     </h3>
 
-                    {mySharedUsers.length === 0 ? (
+                    {sharedMembers.length === 0 ? (
                       <div className="text-center py-8 bg-neutral-50 rounded-2xl">
                         <Users className="w-8 h-8 text-neutral-300 mx-auto mb-2" />
                         <p className="text-neutral-500 text-sm">
@@ -280,21 +287,22 @@ export function SharingManager({
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {mySharedUsers.map((access) => {
-                          const config = roleConfig[access.role];
+                        {sharedMembers.map((member) => {
+                          const config = roleConfig[member.role];
                           const Icon = config.icon;
-                          const isUpdating = updatingId === access.id;
+                          const isUpdating = updatingId === member.id;
+                          const statusConfig_item = statusConfig[member.status];
 
                           return (
                             <div
-                              key={access.id}
+                              key={member.id}
                               className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl"
                             >
                               <div className="flex items-center gap-3">
-                                {access.sharedWithPhotoURL ? (
+                                {member.userPhotoURL ? (
                                   <img
-                                    src={access.sharedWithPhotoURL}
-                                    alt={access.sharedWithName || ''}
+                                    src={member.userPhotoURL}
+                                    alt={member.userName || ''}
                                     className="w-10 h-10 rounded-full"
                                   />
                                 ) : (
@@ -304,70 +312,82 @@ export function SharingManager({
                                 )}
                                 <div>
                                   <p className="font-medium text-neutral-900 text-sm">
-                                    {access.sharedWithName || access.sharedWithEmail}
+                                    {member.userName || member.userEmail}
                                   </p>
                                   <p className="text-xs text-neutral-500">
-                                    {access.sharedWithEmail}
+                                    {member.userEmail}
                                   </p>
+                                  {member.status === 'pending' && (
+                                    <span className={`text-xs ${statusConfig_item.color} font-medium`}>
+                                      {statusConfig_item.label} - Waiting for response
+                                    </span>
+                                  )}
                                 </div>
                               </div>
 
                               <div className="flex items-center gap-2">
-                                {/* Role Selector */}
-                                <div className="relative">
-                                  <button
-                                    onClick={() =>
-                                      setShowRoleMenu(
-                                        showRoleMenu === access.id ? null : access.id
-                                      )
-                                    }
-                                    disabled={isUpdating}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${config.color}`}
-                                  >
-                                    <Icon className="w-3 h-3" />
-                                    {config.label}
-                                    <ChevronDown className="w-3 h-3" />
-                                  </button>
+                                {/* Status Badge */}
+                                <span className={`px-2 py-1 rounded-lg text-xs font-medium ${statusConfig_item.bg} ${statusConfig_item.color}`}>
+                                  {statusConfig_item.label}
+                                </span>
 
-                                  {/* Role Dropdown */}
-                                  <AnimatePresence>
-                                    {showRoleMenu === access.id && (
-                                      <motion.div
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -10 }}
-                                        className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-neutral-200 py-1 z-10 min-w-[120px]"
-                                      >
-                                        {(['editor', 'viewer'] as UserRole[]).map(
-                                          (role) => {
-                                            const roleConfig_item = roleConfig[role];
-                                            const RoleIcon = roleConfig_item.icon;
-                                            return (
-                                              <button
-                                                key={role}
-                                                onClick={() =>
-                                                  handleRoleChange(access.id!, role)
-                                                }
-                                                className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-neutral-50 transition-colors ${
-                                                  access.role === role
-                                                    ? 'text-neutral-900'
-                                                    : 'text-neutral-600'
-                                                }`}
-                                              >
-                                                <RoleIcon className="w-3 h-3" />
-                                                {roleConfig_item.label}
-                                              </button>
-                                            );
-                                          }
-                                        )}
-                                      </motion.div>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
+                                {/* Role Selector - only for accepted members */}
+                                {member.status === 'accepted' && (
+                                  <div className="relative">
+                                    <button
+                                      onClick={() =>
+                                        setShowRoleMenu(
+                                          showRoleMenu === member.id ? null : member.id
+                                        )
+                                      }
+                                      disabled={isUpdating}
+                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${config.color}`}
+                                    >
+                                      <Icon className="w-3 h-3" />
+                                      {config.label}
+                                      <ChevronDown className="w-3 h-3" />
+                                    </button>
+
+                                    {/* Role Dropdown */}
+                                    <AnimatePresence>
+                                      {showRoleMenu === member.id && (
+                                        <motion.div
+                                          initial={{ opacity: 0, y: -10 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          exit={{ opacity: 0, y: -10 }}
+                                          className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-neutral-200 py-1 z-10 min-w-[120px]"
+                                        >
+                                          {(['editor', 'viewer'] as UserRole[]).map(
+                                            (role) => {
+                                              const roleConfig_item = roleConfig[role];
+                                              const RoleIcon = roleConfig_item.icon;
+                                              return (
+                                                <button
+                                                  key={role}
+                                                  onClick={() =>
+                                                    handleRoleChange(member.id!, role)
+                                                  }
+                                                  className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-neutral-50 transition-colors ${
+                                                    member.role === role
+                                                      ? 'text-neutral-900'
+                                                      : 'text-neutral-600'
+                                                  }`}
+                                                >
+                                                  <RoleIcon className="w-3 h-3" />
+                                                  {roleConfig_item.label}
+                                                </button>
+                                              );
+                                            }
+                                          )}
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+                                  </div>
+                                )}
 
                                 {/* Revoke Button */}
                                 <button
-                                  onClick={() => handleRevoke(access.id!)}
+                                  onClick={() => handleRevoke(member.id!)}
                                   className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                   title="Revoke access"
                                 >

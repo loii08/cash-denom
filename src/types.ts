@@ -4,6 +4,7 @@ export interface Breakdown {
 
 export interface Transaction {
   id?: string;
+  walletId: string;
   date: Date;
   breakdown: Breakdown;
   total: number;
@@ -15,6 +16,7 @@ export interface Transaction {
 
 export interface ActivityLog {
   id?: string;
+  walletId: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE';
   timestamp: Date;
   details: {
@@ -29,6 +31,7 @@ export interface ActivityLog {
 
 export interface Expense {
   id?: string;
+  walletId: string;
   date: Date;
   amount: number;
   description: string;
@@ -39,7 +42,55 @@ export interface Expense {
 }
 
 export type UserRole = 'owner' | 'editor' | 'viewer';
+export type ShareStatus = 'pending' | 'accepted' | 'declined';
+export type NotificationType = 'SHARE_INVITE' | 'SHARE_ACCEPTED' | 'SHARE_DECLINED' | 'ROLE_CHANGED' | 'REMOVED';
 
+// Wallet/Account for multi-wallet support
+export interface Wallet {
+  id: string;
+  name: string;
+  description?: string;
+  ownerId: string;
+  ownerEmail: string;
+  ownerName?: string;
+  ownerPhotoURL?: string;
+  createdAt: Date;
+  updatedAt?: Date;
+  isDefault?: boolean;
+}
+
+// Wallet membership with share status
+export interface WalletMember {
+  id?: string;
+  walletId: string;
+  userId: string;
+  userEmail: string;
+  userName?: string;
+  userPhotoURL?: string;
+  role: UserRole;
+  status: ShareStatus;
+  invitedBy: string;
+  invitedAt: Date;
+  respondedAt?: Date;
+}
+
+// Notifications for share workflow
+export interface Notification {
+  id?: string;
+  type: NotificationType;
+  fromUserId: string;
+  fromUserName?: string;
+  fromUserEmail?: string;
+  toUserId: string;
+  walletId: string;
+  walletName: string;
+  role?: UserRole;
+  message: string;
+  read: boolean;
+  createdAt: Date;
+}
+
+// Legacy SharedAccess (deprecated, use WalletMember)
 export interface SharedAccess {
   id?: string;
   ownerId: string;

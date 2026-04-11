@@ -149,8 +149,93 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
 
+    // Wallets collection - multi-wallet support
+    match /wallets/{walletId} {
+      allow read: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid ||
+        isWalletMember(walletId, request.auth.uid)
+      );
+      allow list: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid ||
+        isWalletMember(walletId, request.auth.uid)
+      );
+      allow create: if isAuthenticated() && 
+                    request.resource.data.ownerId == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['name', 'ownerId', 'createdAt']);
+      allow update: if isAuthenticated() && 
+                    resource.data.ownerId == request.auth.uid &&
+                    request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Wallet Members collection - manages wallet sharing
+    match /walletMembers/{memberId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.invitedBy == request.auth.uid ||
+        getWalletOwner(resource.data.walletId) == request.auth.uid
+      );
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                    isWalletOwner(resource.data.walletId) &&
+                    request.resource.data.keys().hasAll(['walletId', 'userEmail', 'role', 'status', 'invitedBy', 'invitedAt']);
+      allow update: if isAuthenticated() && (
+        // User accepting/declining their own invitation
+        (resource.data.userEmail == request.auth.token.email && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'userName', 'userPhotoURL', 'status', 'respondedAt'])) ||
+        // Wallet owner updating role
+        isWalletOwner(resource.data.walletId)
+      );
+      allow delete: if isAuthenticated() && (
+        isWalletOwner(resource.data.walletId) ||
+        resource.data.userId == request.auth.uid
+      );
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (
+        resource.data.toUserId == request.auth.uid ||
+        resource.data.fromUserId == request.auth.uid
+      );
+      allow list: if isAuthenticated() && (
+        resource.data.toUserId == request.auth.uid ||
+        resource.data.fromUserId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && 
+                    request.resource.data.fromUserId == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['type', 'fromUserId', 'toUserId', 'walletId', 'walletName', 'message', 'read', 'createdAt']);
+      allow update: if isAuthenticated() && 
+                    resource.data.toUserId == request.auth.uid &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isAuthenticated() && resource.data.toUserId == request.auth.uid;
+    }
+
     match /test/connection {
       allow read: if true;
     }
   }
+}
+
+// Helper functions for multi-wallet system
+function isWalletMember(walletId, userId) {
+  return exists(/databases/$(database)/documents/walletMembers/$(walletId + '_' + userId)) &&
+         get(/databases/$(database)/documents/walletMembers/$(walletId + '_' + userId)).data.userId == userId &&
+         get(/databases/$(database)/documents/walletMembers/$(walletId + '_' + userId)).data.status == 'accepted';
+}
+
+function isWalletOwner(walletId) {
+  return get(/databases/$(database)/documents/wallets/$(walletId)).data.ownerId == request.auth.uid;
+}
+
+function getWalletOwner(walletId) {
+  return get(/databases/$(database)/documents/wallets/$(walletId)).data.ownerId;
+}
+
+function canAccessWallet(walletId, requiredRole) {
+  return isWalletOwner(walletId) ||
+         (isWalletMember(walletId, request.auth.uid) &&
+          (requiredRole == 'viewer' ||
+           (requiredRole == 'editor' && 
+            get(/databases/$(database)/documents/walletMembers/$(walletId + '_' + request.auth.uid)).data.role in ['editor', 'owner'])));
 }

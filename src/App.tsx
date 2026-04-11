@@ -23,8 +23,10 @@ import {
 import { db, auth } from './firebase';
 import { Transaction, Breakdown, ActivityLog, Expense, DENOMINATIONS } from './types';
 import { APP_VERSION } from './constants';
-import { usePermissions } from './hooks/usePermissions';
+import { useWallets } from './hooks/useWallets';
 import { SharingManager } from './components/SharingManager';
+import { NotificationCenter } from './components/NotificationCenter';
+import { WalletSelector } from './components/WalletSelector';
 import type { UserRole } from './types';
 import {
   Plus,
@@ -170,18 +172,34 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
-  // Permissions hook
+  // Wallets hook
   const {
-    sharedAccessList,
-    currentRole,
+    wallets,
+    selectedWallet,
+    selectedWalletId,
+    setSelectedWalletId,
+    loading: isLoadingWallets,
+    error: walletError,
     permissions,
-    shareAccess,
-    revokeAccess,
-    updateRole,
-    getDataOwnerId,
-    hasActiveSharing,
-    isLoading: isLoadingPermissions,
-  } = usePermissions(user);
+    createWallet,
+    updateWallet,
+    deleteWallet,
+    shareWallet,
+    acceptInvitation,
+    declineInvitation,
+    updateMemberRole,
+    removeMember,
+    setDefaultWallet,
+  } = useWallets(user);
+
+  // Sharing modal state
+  const [showSharingModal, setShowSharingModal] = useState(false);
+  const [walletToShare, setWalletToShare] = useState<typeof selectedWallet>(null);
+
+  // Wallet creation modal state
+  const [showCreateWalletModal, setShowCreateWalletModal] = useState(false);
+  const [newWalletName, setNewWalletName] = useState('');
+  const [newWalletDescription, setNewWalletDescription] = useState('');
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -324,10 +342,11 @@ export default function App() {
   }, [user, isOnline, draftTransactions, draftExpenses, addToast]);
 
   const logActivity = async (action: 'CREATE' | 'UPDATE' | 'DELETE', details: any) => {
-    if (!user) return;
+    if (!user || !selectedWallet) return;
     const path = 'activityLogs';
     try {
       await addDoc(collection(db, path), {
+        walletId: selectedWallet.id,
         action,
         timestamp: Timestamp.now(),
         details,
@@ -443,24 +462,25 @@ export default function App() {
     testConnection();
   }, []);
 
-  // Transactions Listener - fetches data for current user or shared owner
+  // Transactions Listener - fetches data for selected wallet
   useEffect(() => {
-    if (!user || !isAuthReady) {
+    if (!user || !isAuthReady || !selectedWalletId) {
       setTransactions([]);
       return;
     }
 
     const path = 'transactions';
-    const dataOwnerId = getDataOwnerId();
-    const constraints = [where('uid', '==', dataOwnerId)];
-
-    const q = query(collection(db, path), ...constraints);
+    const q = query(
+      collection(db, path),
+      where('walletId', '==', selectedWalletId)
+    );
 
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
       const txs: Transaction[] = snapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
+          walletId: data.walletId,
           date: (data.date as Timestamp).toDate(),
           breakdown: data.breakdown,
           total: data.total,
@@ -477,20 +497,19 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user, isAuthReady, getDataOwnerId, sharedAccessList]);
+  }, [user, isAuthReady, selectedWalletId]);
 
-  // Activity Logs Listener - fetches logs for current user or shared owner
+  // Activity Logs Listener - fetches logs for selected wallet
   useEffect(() => {
-    if (!user || !isAuthReady) {
+    if (!user || !isAuthReady || !selectedWalletId) {
       setActivityLogs([]);
       return;
     }
 
     const path = 'activityLogs';
-    const dataOwnerId = getDataOwnerId();
     const q = query(
       collection(db, path),
-      where('uid', '==', dataOwnerId)
+      where('walletId', '==', selectedWalletId)
     );
 
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
@@ -498,6 +517,7 @@ export default function App() {
         const data = doc.data();
         return {
           id: doc.id,
+          walletId: data.walletId,
           action: data.action,
           timestamp: (data.timestamp as Timestamp).toDate(),
           details: data.details,
@@ -513,20 +533,19 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user, isAuthReady, getDataOwnerId, sharedAccessList]);
+  }, [user, isAuthReady, selectedWalletId]);
 
-  // Expenses Listener - fetches expenses for current user or shared owner
+  // Expenses Listener - fetches expenses for selected wallet
   useEffect(() => {
-    if (!user || !isAuthReady) {
+    if (!user || !isAuthReady || !selectedWalletId) {
       setExpenses([]);
       return;
     }
 
     const path = 'expenses';
-    const dataOwnerId = getDataOwnerId();
     const q = query(
       collection(db, path),
-      where('uid', '==', dataOwnerId)
+      where('walletId', '==', selectedWalletId)
     );
 
     const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
@@ -534,6 +553,7 @@ export default function App() {
         const data = doc.data();
         return {
           id: doc.id,
+          walletId: data.walletId,
           date: (data.date as Timestamp).toDate(),
           amount: data.amount,
           description: data.description,
@@ -549,7 +569,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user, isAuthReady, getDataOwnerId, sharedAccessList]);
+  }, [user, isAuthReady, selectedWalletId]);
 
   const currentTotal = useMemo(() => {
     return DENOMINATIONS.reduce((acc, d) => acc + (d * (quantities[d] || 0)), 0);
@@ -697,8 +717,14 @@ export default function App() {
 
     setIsSaving(true);
     const path = 'transactions';
-    // Use the data owner ID (current user or shared owner) for saving
-    const dataOwnerId = getDataOwnerId() || user.uid;
+    const walletId = selectedWallet?.id;
+    
+    if (!walletId) {
+      addToast('No wallet selected', 'error');
+      setIsSaving(false);
+      return;
+    }
+    
     try {
       if (editingId) {
         // Check if user can edit
@@ -722,10 +748,11 @@ export default function App() {
         // Save transaction (online or offline)
         if (isOnline) {
           const docRef = await addDoc(collection(db, path), {
+            walletId,
             date: Timestamp.now(),
             breakdown: quantities,
             total: currentTotal,
-            uid: dataOwnerId
+            uid: user.uid
           });
           await logActivity('CREATE', {
             transactionId: docRef.id,
@@ -737,10 +764,11 @@ export default function App() {
           // Save as draft when offline
           const newDraft: Transaction = {
             id: `draft-${Date.now()}`,
+            walletId,
             date: new Date(),
             breakdown: quantities,
             total: currentTotal,
-            uid: dataOwnerId,
+            uid: user.uid,
             isDraft: true
           };
           const updated = [newDraft, ...draftTransactions];
@@ -824,15 +852,22 @@ export default function App() {
 
     setIsExpenseSaving(true);
     const path = 'expenses';
-    // Use the data owner ID (current user or shared owner) for saving
-    const dataOwnerId = getDataOwnerId() || user.uid;
+    const walletId = selectedWallet?.id;
+    
+    if (!walletId) {
+      addToast('No wallet selected', 'error');
+      setIsExpenseSaving(false);
+      return;
+    }
+    
     try {
       if (isOnline) {
         const docRef = await addDoc(collection(db, path), {
+          walletId,
           date: Timestamp.now(),
           amount,
           description: expenseDescription,
-          uid: dataOwnerId
+          uid: user.uid
         });
         await logActivity('CREATE', {
           expenseId: docRef.id,
@@ -844,10 +879,11 @@ export default function App() {
         // Save as draft when offline
         const newDraft: Expense = {
           id: `draft-${Date.now()}`,
+          walletId,
           date: new Date(),
           amount,
           description: expenseDescription,
-          uid: dataOwnerId,
+          uid: user.uid,
           isDraft: true
         };
         const updated = [newDraft, ...draftExpenses];
@@ -863,10 +899,11 @@ export default function App() {
       if (!isOnline) {
         const newDraft: Expense = {
           id: `draft-${Date.now()}`,
+          walletId: selectedWallet?.id || '',
           date: new Date(),
           amount,
           description: expenseDescription,
-          uid: dataOwnerId,
+          uid: user.uid,
           isDraft: true
         };
         const updated = [newDraft, ...draftExpenses];
@@ -1320,27 +1357,33 @@ export default function App() {
                 Install
               </button>
             )}
-            {/* Role Badge */}
-            <div className={`px-3 py-1.5 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
-              currentRole === 'owner'
-                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                : currentRole === 'editor'
-                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            }`}>
-              {currentRole === 'owner' && <Shield className="w-3 h-3" />}
-              {currentRole === 'editor' && <Edit2 className="w-3 h-3" />}
-              {currentRole === 'viewer' && <Eye className="w-3 h-3" />}
-              {currentRole.charAt(0).toUpperCase() + currentRole.slice(1)}
-            </div>
-            {/* Sharing Manager - only for owners */}
-            {permissions.canShare && (
-              <SharingManager
-                sharedAccessList={sharedAccessList}
-                onShareAccess={shareAccess}
-                onRevokeAccess={revokeAccess}
-                onUpdateRole={updateRole}
-                currentUserEmail={user?.email || null}
+            {/* Wallet Selector */}
+            {user && (
+              <WalletSelector
+                wallets={wallets}
+                selectedWallet={selectedWallet}
+                onSelectWallet={setSelectedWalletId}
+                onCreateWallet={() => setShowCreateWalletModal(true)}
+                onEditWallet={(wallet) => {
+                  // TODO: Implement edit wallet
+                }}
+                onDeleteWallet={(wallet) => {
+                  // TODO: Implement delete wallet
+                }}
+                onShareWallet={(wallet) => {
+                  setWalletToShare(wallet);
+                  setShowSharingModal(true);
+                }}
+                onSetDefault={setDefaultWallet}
+                user={user}
+              />
+            )}
+            {/* Notification Center */}
+            {user && (
+              <NotificationCenter
+                user={user}
+                onAcceptInvite={acceptInvitation}
+                onDeclineInvite={declineInvitation}
               />
             )}
             <button
