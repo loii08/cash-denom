@@ -1234,38 +1234,71 @@ export default function App() {
                             )}
                           </div>
                           <p className="text-sm text-neutral-500">{wallet.description || 'No description'}</p>
+                          {wallet.myStatus === 'pending' && (
+                            <p className="text-xs text-amber-600 mt-1">Pending invitation</p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        {wallet.ownerId === user.uid && !wallet.isDefault && (
-                          <button
-                            onClick={() => setDefaultWallet(wallet.id)}
-                            className="p-2 text-neutral-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Set as default"
-                          >
-                            <Star className="w-4 h-4" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            setSelectedWalletId(wallet.id);
-                            setShowUserProfile(false);
-                          }}
-                          className="px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-sm hover:bg-emerald-100 transition-colors"
-                        >
-                          Select
-                        </button>
-                        {wallet.ownerId === user.uid && (
-                          <button
-                            onClick={() => {
-                              setWalletToShare(wallet);
-                              setShowSharingModal(true);
-                            }}
-                            className="p-2 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Share wallet"
-                          >
-                            <Share2 className="w-4 h-4" />
-                          </button>
+                        {wallet.myStatus === 'pending' ? (
+                          <>
+                            <button
+                              onClick={() => {
+                                // Find memberId for this wallet
+                                const member = wallet.members?.find(m => m.userEmail === user?.email?.toLowerCase());
+                                if (member) {
+                                  acceptInvitation(member.id, wallet.id);
+                                }
+                              }}
+                              className="px-3 py-2 bg-emerald-500 text-white rounded-lg font-bold text-sm hover:bg-emerald-600 transition-colors"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => {
+                                const member = wallet.members?.find(m => m.userEmail === user?.email?.toLowerCase());
+                                if (member) {
+                                  declineInvitation(member.id, wallet.id);
+                                }
+                              }}
+                              className="px-3 py-2 bg-white text-neutral-600 border border-neutral-200 rounded-lg font-bold text-sm hover:bg-neutral-50 transition-colors"
+                            >
+                              Decline
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {wallet.ownerId === user.uid && !wallet.isDefault && (
+                              <button
+                                onClick={() => setDefaultWallet(wallet.id)}
+                                className="p-2 text-neutral-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                title="Set as default"
+                              >
+                                <Star className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                setSelectedWalletId(wallet.id);
+                                setShowUserProfile(false);
+                              }}
+                              className="px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-sm hover:bg-emerald-100 transition-colors"
+                            >
+                              Select
+                            </button>
+                            {wallet.ownerId === user.uid && (
+                              <button
+                                onClick={() => {
+                                  setWalletToShare(wallet);
+                                  setShowSharingModal(true);
+                                }}
+                                className="p-2 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                title="Share wallet"
+                              >
+                                <Share2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, updateDoc, doc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, updateDoc, doc, Timestamp, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Notification } from '../types';
 import type { User } from 'firebase/auth';
@@ -18,30 +18,65 @@ export function NotificationCenter({ user, onAcceptInvite, onDeclineInvite }: No
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Subscribe to notifications
+  // Subscribe to notifications - by userId OR userEmail (for pending invites)
   useEffect(() => {
-    if (!user) return;
+    if (!user || !user.email) return;
 
-    const q = query(
+    // Query 1: Notifications to this user (accepted invites, role changes, etc.)
+    const q1 = query(
       collection(db, 'notifications'),
       where('toUserId', '==', user.uid),
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    // Query 2: Pending share invites to this email (user hasn't accepted yet)
+    const q2 = query(
+      collection(db, 'notifications'),
+      where('toUserEmail', '==', user.email.toLowerCase()),
+      where('type', '==', 'SHARE_INVITE'),
+      orderBy('createdAt', 'desc')
+    );
+
+    let allNotifs: Notification[] = [];
+
+    const unsubscribe1 = onSnapshot(q1, (snapshot) => {
       const notifs: Notification[] = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate(),
       } as Notification));
-
-      setNotifications(notifs);
-      setUnreadCount(notifs.filter(n => !n.read).length);
+      
+      // Merge and deduplicate
+      allNotifs = [...notifs, ...allNotifs.filter(n => n.toUserId !== user.uid)];
+      // Remove duplicates by id
+      const unique = allNotifs.filter((n, i, arr) => arr.findIndex(t => t.id === n.id) === i);
+      setNotifications(unique);
+      setUnreadCount(unique.filter(n => !n.read).length);
     }, (err) => {
-      console.error('Error fetching notifications:', err);
+      console.error('Error fetching notifications by userId:', err);
     });
 
-    return () => unsubscribe();
+    const unsubscribe2 = onSnapshot(q2, (snapshot) => {
+      const notifs: Notification[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate(),
+      } as Notification));
+      
+      // Merge and deduplicate
+      allNotifs = [...allNotifs.filter(n => n.type !== 'SHARE_INVITE'), ...notifs];
+      // Remove duplicates by id
+      const unique = allNotifs.filter((n, i, arr) => arr.findIndex(t => t.id === n.id) === i);
+      setNotifications(unique);
+      setUnreadCount(unique.filter(n => !n.read).length);
+    }, (err) => {
+      console.error('Error fetching notifications by email:', err);
+    });
+
+    return () => {
+      unsubscribe1();
+      unsubscribe2();
+    };
   }, [user]);
 
   const markAsRead = async (notificationId: string) => {
@@ -66,20 +101,22 @@ export function NotificationCenter({ user, onAcceptInvite, onDeclineInvite }: No
   };
 
   const handleAccept = async (notification: Notification) => {
-    if (!notification.id) return;
+    if (!notification.id || !user.email) return;
     
     setLoading(true);
     try {
-      // Find the member record by walletId and user
+      // Find the member record by walletId and user email
       const memberQuery = query(
         collection(db, 'walletMembers'),
         where('walletId', '==', notification.walletId),
-        where('userEmail', '==', user.email)
+        where('userEmail', '==', user.email.toLowerCase())
       );
       
-      // We need to get the member ID to accept
-      // For now, we'll pass empty string and let the parent handle it
-      await onAcceptInvite('', notification.walletId);
+      const memberSnap = await getDocs(memberQuery);
+      if (!memberSnap.empty) {
+        const memberId = memberSnap.docs[0].id;
+        await onAcceptInvite(memberId, notification.walletId);
+      }
       await markAsRead(notification.id);
     } catch (err) {
       console.error('Error accepting invitation:', err);
@@ -89,11 +126,22 @@ export function NotificationCenter({ user, onAcceptInvite, onDeclineInvite }: No
   };
 
   const handleDecline = async (notification: Notification) => {
-    if (!notification.id) return;
+    if (!notification.id || !user.email) return;
     
     setLoading(true);
     try {
-      await onDeclineInvite('', notification.walletId);
+      // Find the member record by walletId and user email
+      const memberQuery = query(
+        collection(db, 'walletMembers'),
+        where('walletId', '==', notification.walletId),
+        where('userEmail', '==', user.email.toLowerCase())
+      );
+      
+      const memberSnap = await getDocs(memberQuery);
+      if (!memberSnap.empty) {
+        const memberId = memberSnap.docs[0].id;
+        await onDeclineInvite(memberId, notification.walletId);
+      }
       await markAsRead(notification.id);
     } catch (err) {
       console.error('Error declining invitation:', err);

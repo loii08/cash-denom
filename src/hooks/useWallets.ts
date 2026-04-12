@@ -33,11 +33,18 @@ export function useWallets(user: User | null) {
       where('ownerId', '==', user.uid)
     );
 
-    // Query 2: Wallet memberships where user is a member
+    // Query 2a: Wallet memberships where user is a member (accepted invites)
     const memberQuery = query(
       collection(db, 'walletMembers'),
       where('userId', '==', user.uid),
       where('status', 'in', ['pending', 'accepted'])
+    );
+
+    // Query 2b: Pending invites by email (user hasn't accepted yet)
+    const pendingInviteQuery = query(
+      collection(db, 'walletMembers'),
+      where('userEmail', '==', user.email?.toLowerCase()),
+      where('status', '==', 'pending')
     );
 
     const unsubOwned = onSnapshot(ownedQuery, (snapshot) => {
@@ -66,15 +73,8 @@ export function useWallets(user: User | null) {
       setLoading(false);
     });
 
-    const unsubMembers = onSnapshot(memberQuery, async (snapshot) => {
-      const memberships: WalletMember[] = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        invitedAt: doc.data().invitedAt?.toDate(),
-        respondedAt: doc.data().respondedAt?.toDate(),
-      } as WalletMember));
-
-      // Fetch wallet details for each membership
+    // Helper function to process memberships and fetch wallet details
+    const processMemberships = async (memberships: WalletMember[]) => {
       const walletIds = memberships.map(m => m.walletId);
       if (walletIds.length === 0) return;
 
@@ -95,6 +95,8 @@ export function useWallets(user: User | null) {
 
       setWallets(prev => {
         const ownedWallets = prev.filter(w => w.ownerId === user.uid);
+        const existingSharedIds = new Set(ownedWallets.map(w => w.id));
+        
         const updatedShared = sharedWallets.map(w => {
           const membership = memberships.find(m => m.walletId === w.id);
           return {
@@ -103,11 +105,35 @@ export function useWallets(user: User | null) {
             myRole: membership?.role,
             myStatus: membership?.status,
           };
-        });
+        }).filter(w => !existingSharedIds.has(w.id));
+        
         return [...ownedWallets, ...updatedShared];
       });
+    };
+
+    const unsubMembers = onSnapshot(memberQuery, async (snapshot) => {
+      const memberships: WalletMember[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        invitedAt: doc.data().invitedAt?.toDate(),
+        respondedAt: doc.data().respondedAt?.toDate(),
+      } as WalletMember));
+      await processMemberships(memberships);
     }, (err) => {
-      console.error('Error fetching wallet memberships:', err);
+      console.error('Error fetching wallet memberships by userId:', err);
+    });
+
+    // Subscribe to pending invites by email
+    const unsubPendingInvites = onSnapshot(pendingInviteQuery, async (snapshot) => {
+      const memberships: WalletMember[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        invitedAt: doc.data().invitedAt?.toDate(),
+        respondedAt: doc.data().respondedAt?.toDate(),
+      } as WalletMember));
+      await processMemberships(memberships);
+    }, (err) => {
+      console.error('Error fetching pending invites by email:', err);
     });
 
     // Fetch members for each wallet
@@ -131,6 +157,7 @@ export function useWallets(user: User | null) {
     return () => {
       unsubOwned();
       unsubMembers();
+      unsubPendingInvites();
       unsubWalletMembers();
     };
   }, [user]);

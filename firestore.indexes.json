@@ -47,6 +47,20 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "userEmail",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "walletMembers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
           "fieldPath": "walletId",
           "order": "ASCENDING"
         },
