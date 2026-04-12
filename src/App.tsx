@@ -1548,7 +1548,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100 pb-20">
+    <div className="min-h-screen bg-neutral-100 pb-28">
       {/* Toast Container */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">
         <AnimatePresence>
