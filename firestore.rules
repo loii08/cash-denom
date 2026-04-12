@@ -202,8 +202,9 @@ service cloud.firestore {
         isWalletOwner(resource.data.walletId)
       );
       allow delete: if isAuthenticated() && (
-        isWalletOwner(resource.data.walletId) ||
-        resource.data.userId == request.auth.uid
+        resource.data.invitedBy == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.userEmail == request.auth.token.email
       );
     }
 

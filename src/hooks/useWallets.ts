@@ -437,14 +437,19 @@ export function useWallets(user: User | null) {
   }, [user]);
 
   // Remove member from wallet
-  const removeMember = useCallback(async (memberId: string) => {
+  const removeMember = useCallback(async (walletId: string, memberId: string) => {
     if (!user) return;
 
     try {
+      // Verify the current user is the wallet owner
+      const walletDoc = await getDocs(query(collection(db, 'wallets'), where('__name__', '==', walletId)));
+      if (walletDoc.empty) throw new Error('Wallet not found');
+      if (walletDoc.docs[0].data().ownerId !== user.uid) throw new Error('Only the wallet owner can remove members');
+
       await deleteDoc(doc(db, 'walletMembers', memberId));
     } catch (err) {
       console.error('Error removing member:', err);
-      throw new Error('Failed to remove member');
+      throw err;
     }
   }, [user]);
 
