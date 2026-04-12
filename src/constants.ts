@@ -1,8 +1,9 @@
 // App version - update this with each release
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.2.1';
 
 // Release notes
 export const VERSION_NOTES: Record<string, string> = {
+  '1.2.1': 'Fixed wallet sharing - notifications by email, accept/decline buttons, pending invites',
   '1.2.0': 'Multi-wallet system: Create multiple wallets, share with others, notification center for invites, default wallet selection',
   '1.1.0': 'Added role-based access control: Owner, Editor, and Viewer roles with sharing capabilities',
   '1.0.9': 'Fixed NET SAVINGS to remain constant regardless of date filter',
