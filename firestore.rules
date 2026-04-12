@@ -182,6 +182,7 @@ service cloud.firestore {
     match /walletMembers/{memberId} {
       allow read: if isAuthenticated() && (
         resource.data.userId == request.auth.uid ||
+        resource.data.userEmail == request.auth.token.email ||
         resource.data.invitedBy == request.auth.uid ||
         isWalletOwner(resource.data.walletId)
       );
