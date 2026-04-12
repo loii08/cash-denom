@@ -120,6 +120,10 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow create, update: if isAuthenticated() && request.auth.uid == userId;
     }
+    // Allow listing users by email (for checking if user exists before sharing)
+    match /users/{userId} {
+      allow list: if isAuthenticated();
+    }
 
     // Expenses collection
     match /expenses/{expenseId} {

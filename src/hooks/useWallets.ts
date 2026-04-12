@@ -275,16 +275,28 @@ export function useWallets(user: User | null) {
     if (!user) return;
 
     try {
+      // Check if user is registered in the application
+      const normalizedEmail = email.toLowerCase().trim();
+      const userQuery = query(
+        collection(db, 'users'),
+        where('email', '==', normalizedEmail)
+      );
+      const userSnapshot = await getDocs(userQuery);
+
+      if (userSnapshot.empty) {
+        throw new Error('❌ User not registered yet. The person must sign in to Cash Tracker at least once before you can share with them.');
+      }
+
       // Check if already shared
       const existingQuery = query(
         collection(db, 'walletMembers'),
         where('walletId', '==', walletId),
-        where('userEmail', '==', email.toLowerCase().trim())
+        where('userEmail', '==', normalizedEmail)
       );
       const existing = await getDocs(existingQuery);
 
       if (!existing.empty) {
-        throw new Error('This user already has access to this wallet');
+        throw new Error('⚠️ This user already has access to this wallet');
       }
 
       // Create wallet member record with pending status
