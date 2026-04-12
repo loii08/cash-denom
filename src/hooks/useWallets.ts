@@ -333,6 +333,13 @@ export function useWallets(user: User | null) {
     if (!user) return;
 
     try {
+      // Get wallet details from Firestore
+      const walletDoc = await getDocs(query(collection(db, 'wallets'), where('__name__', '==', walletId)));
+      if (walletDoc.empty) throw new Error('Wallet not found');
+      const walletData = walletDoc.docs[0].data();
+      const ownerId = walletData.ownerId;
+      const walletName = walletData.name || 'Unnamed Wallet';
+
       // Update member record
       await updateDoc(doc(db, 'walletMembers', memberId), {
         userId: user.uid,
@@ -342,19 +349,17 @@ export function useWallets(user: User | null) {
         respondedAt: Timestamp.now(),
       });
 
-      // Get wallet owner for notification
-      const wallet = wallets.find(w => w.id === walletId);
-      
       // Create notification for the owner
       const notificationData = {
         type: 'SHARE_ACCEPTED' as const,
         fromUserId: user.uid,
         fromUserName: user.displayName,
         fromUserEmail: user.email,
-        toUserId: wallet?.ownerId,
+        toUserId: ownerId,
+        toUserEmail: null,
         walletId,
-        walletName: wallet?.name || 'Unnamed Wallet',
-        message: `${user.displayName || user.email} accepted your invitation to "${wallet?.name || 'Unnamed Wallet'}"`,
+        walletName,
+        message: `${user.displayName || user.email} accepted your invitation to "${walletName}"`,
         read: false,
         createdAt: Timestamp.now(),
       };
