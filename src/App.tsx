@@ -37,6 +37,7 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronLeft,
+  ArrowLeft,
   Calendar,
   PhilippinePeso,
   Edit2,
@@ -56,7 +57,10 @@ import {
   Copy,
   BarChart3,
   Shield,
-  Users
+  Users,
+  User as UserIcon,
+  Share2,
+  Star
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -1075,70 +1079,255 @@ export default function App() {
     );
   };
 
+  const [profileTab, setProfileTab] = useState<'profile' | 'wallets' | 'sharing'>('profile');
+
   const UserProfile = () => {
     if (!showUserProfile || !user) return null;
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl"
-        >
-          <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 p-6 text-white">
-            <button 
-              onClick={() => setShowUserProfile(false)}
-              className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      <div className="fixed inset-0 z-50 bg-neutral-50 overflow-auto">
+        {/* Profile Header */}
+        <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 p-6 pb-8">
+          <div className="max-w-2xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <button 
+                onClick={() => setShowUserProfile(false)}
+                className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h2 className="text-xl font-bold text-white">Profile</h2>
+              <button 
+                onClick={handleLogout}
+                className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
+                title="Sign Out"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
             <div className="flex items-center gap-4">
               {user.photoURL ? (
-                <img src={user.photoURL} alt="Profile" className="w-16 h-16 rounded-full border-4 border-white" />
+                <img src={user.photoURL} alt="Profile" className="w-20 h-20 rounded-full border-4 border-white" />
               ) : (
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                  <Wallet className="w-8 h-8" />
+                <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center">
+                  <UserIcon className="w-10 h-10 text-white" />
                 </div>
               )}
               <div className="text-left">
-                <h3 className="text-xl font-bold">{user.displayName || 'User'}</h3>
-                <p className="text-emerald-100 text-sm">{user.email}</p>
+                <h3 className="text-2xl font-bold text-white">{user.displayName || 'User'}</h3>
+                <p className="text-emerald-100">{user.email}</p>
               </div>
             </div>
           </div>
-          <div className="p-6 space-y-4">
-            <div className="space-y-2">
-              <p className="text-xs uppercase font-bold text-neutral-400 tracking-widest">Account Info</p>
-              <div className="bg-neutral-50 rounded-xl p-4 space-y-3">
-                <div>
-                  <p className="text-xs text-neutral-400 mb-1">Name</p>
-                  <p className="font-semibold text-neutral-900">{user.displayName || 'Not set'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-neutral-400 mb-1">Email</p>
-                  <p className="font-semibold text-neutral-900">{user.email}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-neutral-400 mb-1">User ID</p>
-                  <p className="font-mono text-xs text-neutral-600 break-all">{user.uid}</p>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="max-w-2xl mx-auto px-4 -mt-6">
+          <div className="bg-white rounded-2xl shadow-lg p-1 flex">
+            <button
+              onClick={() => setProfileTab('profile')}
+              className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all ${
+                profileTab === 'profile' 
+                  ? 'bg-emerald-500 text-white' 
+                  : 'text-neutral-600 hover:bg-neutral-100'
+              }`}
+            >
+              <UserIcon className="w-4 h-4 inline mr-2" />
+              Profile
+            </button>
+            <button
+              onClick={() => setProfileTab('wallets')}
+              className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all ${
+                profileTab === 'wallets' 
+                  ? 'bg-emerald-500 text-white' 
+                  : 'text-neutral-600 hover:bg-neutral-100'
+              }`}
+            >
+              <Wallet className="w-4 h-4 inline mr-2" />
+              My Wallets
+            </button>
+            <button
+              onClick={() => setProfileTab('sharing')}
+              className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all ${
+                profileTab === 'sharing' 
+                  ? 'bg-emerald-500 text-white' 
+                  : 'text-neutral-600 hover:bg-neutral-100'
+              }`}
+            >
+              <Share2 className="w-4 h-4 inline mr-2" />
+              Sharing
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="max-w-2xl mx-auto px-4 py-6 pb-20">
+          {profileTab === 'profile' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+                <h3 className="font-bold text-lg text-neutral-900">Account Information</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center py-2 border-b border-neutral-100">
+                    <span className="text-neutral-500">Name</span>
+                    <span className="font-medium text-neutral-900">{user.displayName || 'Not set'}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-neutral-100">
+                    <span className="text-neutral-500">Email</span>
+                    <span className="font-medium text-neutral-900">{user.email}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-neutral-100">
+                    <span className="text-neutral-500">User ID</span>
+                    <span className="font-mono text-xs text-neutral-600">{user.uid.substring(0, 8)}...</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setShowUserProfile(false)}
-                className="flex-1 py-3 font-bold text-neutral-900 hover:bg-neutral-100 rounded-xl transition-all"
-              >
-                Close
-              </button>
-              <button 
-                onClick={handleLogout}
-                className="flex-1 py-3 font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </motion.div>
+              
+              <div className="bg-white rounded-2xl shadow-sm p-6">
+                <h3 className="font-bold text-lg text-neutral-900 mb-4">App Information</h3>
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-500">Version</span>
+                  <span className="font-medium text-neutral-900">v{APP_VERSION}</span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {profileTab === 'wallets' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-lg text-neutral-900">Your Wallets</h3>
+                <button
+                  onClick={() => setShowCreateWalletModal(true)}
+                  className="px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold text-sm hover:bg-emerald-600 transition-colors flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Wallet
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                {wallets.map((wallet) => (
+                  <div 
+                    key={wallet.id} 
+                    className={`bg-white rounded-2xl shadow-sm p-4 border-2 transition-all ${
+                      selectedWallet?.id === wallet.id ? 'border-emerald-500' : 'border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          wallet.isDefault ? 'bg-emerald-100 text-emerald-600' : 'bg-neutral-100 text-neutral-600'
+                        }`}>
+                          <Wallet className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-neutral-900">{wallet.name}</h4>
+                            {wallet.isDefault && (
+                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
+                                Default
+                              </span>
+                            )}
+                            {wallet.ownerId !== user.uid && (
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
+                                Shared
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-neutral-500">{wallet.description || 'No description'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {wallet.ownerId === user.uid && !wallet.isDefault && (
+                          <button
+                            onClick={() => setDefaultWallet(wallet.id)}
+                            className="p-2 text-neutral-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                            title="Set as default"
+                          >
+                            <Star className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedWalletId(wallet.id);
+                            setShowUserProfile(false);
+                          }}
+                          className="px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-sm hover:bg-emerald-100 transition-colors"
+                        >
+                          Select
+                        </button>
+                        {wallet.ownerId === user.uid && (
+                          <button
+                            onClick={() => {
+                              setWalletToShare(wallet);
+                              setShowSharingModal(true);
+                            }}
+                            className="p-2 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Share wallet"
+                          >
+                            <Share2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {wallets.length === 0 && (
+                  <div className="text-center py-8 text-neutral-500">
+                    <Wallet className="w-12 h-12 mx-auto mb-3 text-neutral-300" />
+                    <p>No wallets yet. Create your first wallet!</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {profileTab === 'sharing' && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              <h3 className="font-bold text-lg text-neutral-900">Wallet Sharing</h3>
+              <p className="text-neutral-500">Manage sharing settings for your wallets in the My Wallets tab.</p>
+              
+              <div className="bg-white rounded-2xl shadow-sm p-6">
+                <h4 className="font-bold text-neutral-900 mb-2">How Sharing Works</h4>
+                <ul className="space-y-2 text-sm text-neutral-600">
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                    Go to My Wallets and click the share icon
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                    Enter the email of the person you want to share with
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                    Choose their role: Viewer (read-only) or Editor (can add/edit)
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">4</span>
+                    They'll receive a notification to accept the invitation
+                  </li>
+                </ul>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm p-6">
+                <h4 className="font-bold text-neutral-900 mb-2">Role Permissions</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded">Owner</span>
+                    <span className="text-sm text-neutral-600">Full control, can share and manage roles</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded">Editor</span>
+                    <span className="text-sm text-neutral-600">Can add, edit, and delete transactions</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="px-2 py-1 bg-neutral-100 text-neutral-700 text-xs font-bold rounded">Viewer</span>
+                    <span className="text-sm text-neutral-600">Can only view transactions and data</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </div>
       </div>
     );
   };
@@ -1365,27 +1554,6 @@ export default function App() {
                 Install
               </button>
             )}
-            {/* Wallet Selector */}
-            {user && (
-              <WalletSelector
-                wallets={wallets}
-                selectedWallet={selectedWallet}
-                onSelectWallet={setSelectedWalletId}
-                onCreateWallet={() => setShowCreateWalletModal(true)}
-                onEditWallet={(wallet) => {
-                  // TODO: Implement edit wallet
-                }}
-                onDeleteWallet={(wallet) => {
-                  // TODO: Implement delete wallet
-                }}
-                onShareWallet={(wallet) => {
-                  setWalletToShare(wallet);
-                  setShowSharingModal(true);
-                }}
-                onSetDefault={setDefaultWallet}
-                user={user}
-              />
-            )}
             {/* Notification Center */}
             {user && (
               <NotificationCenter
@@ -1402,7 +1570,7 @@ export default function App() {
               {user?.photoURL ? (
                 <img src={user.photoURL} alt="Profile" className="w-5 h-5 rounded-full" />
               ) : (
-                <Wallet className="w-5 h-5" />
+                <UserIcon className="w-5 h-5" />
               )}
             </button>
           </div>
