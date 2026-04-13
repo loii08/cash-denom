@@ -419,6 +419,9 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setIsAuthReady(true);
+      // Ensure profile is not shown on login
+      setShowUserProfile(false);
+      setActiveTab('history');
       if (user) {
         const path = 'users';
         const userDoc = doc(db, path, user.uid);
@@ -1611,6 +1614,24 @@ export default function App() {
       </header>
 
       <main className="max-w-2xl mx-auto p-4 space-y-6">
+        {/* Skeleton Loading */}
+        {isLoadingWallets && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+              <div className="h-6 bg-neutral-200 rounded-lg animate-pulse w-1/3"></div>
+              <div className="h-20 bg-neutral-200 rounded-xl animate-pulse"></div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+              <div className="h-6 bg-neutral-200 rounded-lg animate-pulse w-1/4"></div>
+              <div className="space-y-3">
+                <div className="h-12 bg-neutral-200 rounded-lg animate-pulse"></div>
+                <div className="h-12 bg-neutral-200 rounded-lg animate-pulse"></div>
+                <div className="h-12 bg-neutral-200 rounded-lg animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <DeleteModal />
         <ExpenseDeleteModal />
         <UserProfile />
