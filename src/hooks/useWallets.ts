@@ -136,9 +136,12 @@ export function useWallets(user: User | null) {
       console.error('Error fetching pending invites by email:', err);
     });
 
-    // Fetch members for each wallet
+    // Fetch members for each wallet - only for wallets the user owns or is member of
     const unsubWalletMembers = onSnapshot(
-      query(collection(db, 'walletMembers')),
+      query(
+        collection(db, 'walletMembers'),
+        where('userId', '==', user.uid)
+      ),
       (snapshot) => {
         const allMembers: WalletMember[] = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -151,6 +154,9 @@ export function useWallets(user: User | null) {
           ...w,
           members: allMembers.filter(m => m.walletId === w.id),
         })));
+      },
+      (err) => {
+        console.error('Error fetching wallet members:', err);
       }
     );
 

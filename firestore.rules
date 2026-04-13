@@ -185,13 +185,11 @@ service cloud.firestore {
 
     // Wallet Members collection - manages wallet sharing
     match /walletMembers/{memberId} {
-      allow read: if isAuthenticated() && (
+      allow read, list: if isAuthenticated() && (
         resource.data.userId == request.auth.uid ||
         resource.data.userEmail == request.auth.token.email ||
-        resource.data.invitedBy == request.auth.uid ||
-        isWalletOwner(resource.data.walletId)
+        resource.data.invitedBy == request.auth.uid
       );
-      allow list: if isAuthenticated();
       allow create: if isAuthenticated() && 
                     isWalletOwner(request.resource.data.walletId) &&
                     request.resource.data.keys().hasAll(['walletId', 'userEmail', 'role', 'status', 'invitedBy', 'invitedAt']);
