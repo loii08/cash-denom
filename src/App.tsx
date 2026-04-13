@@ -452,6 +452,11 @@ export default function App() {
         setConnectionError(null);
       } catch (error) {
         if (error instanceof Error) {
+          // Ignore permission errors for test connection (document might not exist)
+          if (error.message.includes('Missing or insufficient permissions') || error.message.includes('not found')) {
+            setConnectionError(null);
+            return;
+          }
           if (error.message.includes('the client is offline') || error.message.includes('Failed to get document from server')) {
             if (retryCount < maxRetries) {
               retryCount++;
@@ -1615,7 +1620,7 @@ export default function App() {
 
       <main className="max-w-2xl mx-auto p-4 space-y-6">
         {/* Skeleton Loading */}
-        {isLoadingWallets && (
+        {isLoadingWallets ? (
           <div className="space-y-6">
             <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
               <div className="h-6 bg-neutral-200 rounded-lg animate-pulse w-1/3"></div>
@@ -1630,12 +1635,14 @@ export default function App() {
               </div>
             </div>
           </div>
+        ) : (
+          <>
+            <DeleteModal />
+            <ExpenseDeleteModal />
+            <UserProfile />
+          </>
         )}
 
-        <DeleteModal />
-        <ExpenseDeleteModal />
-        <UserProfile />
-        
         {/* Sharing Manager Modal */}
         {showSharingModal && walletToShare && (
           <SharingManager
