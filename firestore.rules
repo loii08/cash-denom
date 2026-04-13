@@ -1,5 +1,6 @@
 rules_version = '2';
 
+// Deployed: v1.2.2 - Fixed walletMembers update/delete rules
 service cloud.firestore {
   // ===============================================================
   // Helper Functions
