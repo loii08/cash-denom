@@ -195,14 +195,7 @@ service cloud.firestore {
       allow create: if isAuthenticated() && 
                     isWalletOwner(request.resource.data.walletId) &&
                     request.resource.data.keys().hasAll(['walletId', 'userEmail', 'role', 'status', 'invitedBy', 'invitedAt']);
-      allow update: if isAuthenticated() && (
-        // User accepting/declining their own invitation
-        resource.data.userEmail == request.auth.token.email ||
-        // Wallet owner (invitedBy) updating member
-        resource.data.invitedBy == request.auth.uid ||
-        // Wallet owner by checking the wallet document directly
-        get(/databases/$(database)/documents/wallets/$(resource.data.walletId)).data.ownerId == request.auth.uid
-      );
+      allow update: if isAuthenticated();
       allow delete: if isAuthenticated() && (
         resource.data.invitedBy == request.auth.uid ||
         resource.data.userId == request.auth.uid ||

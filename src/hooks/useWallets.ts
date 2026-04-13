@@ -422,17 +422,22 @@ export function useWallets(user: User | null) {
   }, [user, wallets]);
 
   // Update member role
-  const updateMemberRole = useCallback(async (memberId: string, newRole: UserRole) => {
+  const updateMemberRole = useCallback(async (walletId: string, memberId: string, newRole: UserRole) => {
     if (!user) return;
 
     try {
+      // Verify the current user is the wallet owner
+      const walletDoc = await getDocs(query(collection(db, 'wallets'), where('__name__', '==', walletId)));
+      if (walletDoc.empty) throw new Error('Wallet not found');
+      if (walletDoc.docs[0].data().ownerId !== user.uid) throw new Error('Only the wallet owner can update member roles');
+
       await updateDoc(doc(db, 'walletMembers', memberId), {
         role: newRole,
         updatedAt: Timestamp.now(),
       });
     } catch (err) {
       console.error('Error updating member role:', err);
-      throw new Error('Failed to update role');
+      throw err;
     }
   }, [user]);
 
