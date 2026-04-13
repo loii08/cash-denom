@@ -1618,10 +1618,10 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto p-4 space-y-6">
-        {/* Skeleton Loading */}
-        {isLoadingWallets ? (
-          <div className="space-y-6">
+      <main className="max-w-2xl mx-auto p-4 space-y-6 relative">
+        {/* Skeleton Loading Overlay */}
+        {isLoadingWallets && (
+          <div className="absolute inset-0 z-50 space-y-6 bg-neutral-100 p-4">
             <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
               <div className="h-6 bg-neutral-200 rounded-lg animate-pulse w-1/3"></div>
               <div className="h-20 bg-neutral-200 rounded-xl animate-pulse"></div>
@@ -1635,13 +1635,11 @@ export default function App() {
               </div>
             </div>
           </div>
-        ) : (
-          <>
-            <DeleteModal />
-            <ExpenseDeleteModal />
-            <UserProfile />
-          </>
         )}
+
+        <DeleteModal />
+        <ExpenseDeleteModal />
+        <UserProfile />
 
         {/* Sharing Manager Modal */}
         {showSharingModal && walletToShare && (
