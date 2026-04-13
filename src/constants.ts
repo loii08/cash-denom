@@ -1,8 +1,10 @@
 // App version - update this with each release
-export const APP_VERSION = '1.2.2';
+export const APP_VERSION = '1.2.4';
 
 // Release notes
 export const VERSION_NOTES: Record<string, string> = {
+  '1.2.4': 'Auto-incremented version',
+  '1.2.3': 'Auto-incremented version',
   '1.2.2': 'Added user registration check before sharing, increased footer padding for visibility',
   '1.2.1': 'Fixed wallet sharing - notifications by email, accept/decline buttons, pending invites',
   '1.2.0': 'Multi-wallet system: Create multiple wallets, share with others, notification center for invites, default wallet selection',
