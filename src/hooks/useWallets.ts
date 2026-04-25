@@ -363,14 +363,8 @@ export function useWallets(user: User | null) {
     if (!user) return;
 
     try {
-      // Get member details to find owner (invitedBy)
-      const memberDoc = await getDocs(query(collection(db, 'walletMembers'), where('__name__', '==', memberId)));
-      if (memberDoc.empty) throw new Error('Invitation not found');
-      const memberData = memberDoc.docs[0].data();
-      const invitedBy = memberData.invitedBy;
-      const walletNameFromMember = walletName || memberData.walletName || 'Unnamed Wallet';
-
-      // Update member record
+      // Update member record directly - no need to read first
+      // The update rule allows any authenticated user to update
       await updateDoc(doc(db, 'walletMembers', memberId), {
         userId: user.uid,
         userName: user.displayName,
@@ -385,11 +379,11 @@ export function useWallets(user: User | null) {
         fromUserId: user.uid,
         fromUserName: user.displayName,
         fromUserEmail: user.email,
-        toUserId: ownerId || invitedBy,
+        toUserId: ownerId,
         toUserEmail: null,
         walletId,
-        walletName: walletNameFromMember,
-        message: `${user.displayName || user.email} accepted your invitation to "${walletNameFromMember}"`,
+        walletName: walletName || 'Unnamed Wallet',
+        message: `${user.displayName || user.email} accepted your invitation to "${walletName || 'Unnamed Wallet'}"`,
         read: false,
         createdAt: Timestamp.now(),
       };
