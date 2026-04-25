@@ -60,7 +60,8 @@ import {
   Users,
   User as UserIcon,
   Share2,
-  Star
+  Star,
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -1077,124 +1078,169 @@ export default function App() {
 
   const UserProfile = () => {
     if (!showUserProfile || !user) return null;
+    
+    // Get sharing data
+    const ownedWallets = wallets.filter(w => w.ownerId === user.uid);
+    const sharedWithMe = wallets.filter(w => w.ownerId !== user.uid && w.myStatus === 'accepted');
+    const pendingInvites = wallets.filter(w => w.ownerId !== user.uid && w.myStatus === 'pending');
+    
     return (
       <div className="fixed inset-0 z-50 bg-neutral-50 overflow-auto">
-        {/* Profile Header */}
-        <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 p-6 pb-8">
+        {/* Profile Header - Mobile Optimized */}
+        <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 p-4 sm:p-6 pb-6 sm:pb-8">
           <div className="max-w-2xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
               <button 
                 onClick={() => setShowUserProfile(false)}
                 className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
               >
-                <ArrowLeft className="w-6 h-6" />
+                <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
-              <h2 className="text-xl font-bold text-white">Profile</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-white">Profile</h2>
               <button 
                 onClick={handleLogout}
                 className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
                 title="Sign Out"
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
               {user.photoURL ? (
-                <img src={user.photoURL} alt="Profile" className="w-20 h-20 rounded-full border-4 border-white" />
+                <img src={user.photoURL} alt="Profile" className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-3 sm:border-4 border-white" />
               ) : (
-                <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center">
-                  <UserIcon className="w-10 h-10 text-white" />
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/20 rounded-full flex items-center justify-center">
+                  <UserIcon className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
                 </div>
               )}
-              <div className="text-left">
-                <h3 className="text-2xl font-bold text-white">{user.displayName || 'User'}</h3>
-                <p className="text-emerald-100">{user.email}</p>
+              <div className="text-left min-w-0 flex-1">
+                <h3 className="text-xl sm:text-2xl font-bold text-white truncate">{user.displayName || 'User'}</h3>
+                <p className="text-emerald-100 text-sm sm:text-base truncate">{user.email}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="max-w-2xl mx-auto px-4 -mt-6">
-          <div className="bg-white rounded-2xl shadow-lg p-1 flex">
+        {/* Tab Navigation - Mobile Optimized */}
+        <div className="max-w-2xl mx-auto px-3 sm:px-4 -mt-4 sm:-mt-6">
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-1 flex">
             <button
               onClick={() => setProfileTab('profile')}
-              className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all ${
+              className={`flex-1 py-2.5 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm transition-all ${
                 profileTab === 'profile' 
                   ? 'bg-emerald-500 text-white' 
                   : 'text-neutral-600 hover:bg-neutral-100'
               }`}
             >
-              <UserIcon className="w-4 h-4 inline mr-2" />
-              Profile
+              <UserIcon className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Profile</span>
+              <span className="sm:hidden">Profile</span>
             </button>
             <button
               onClick={() => setProfileTab('wallets')}
-              className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all ${
+              className={`flex-1 py-2.5 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm transition-all ${
                 profileTab === 'wallets' 
                   ? 'bg-emerald-500 text-white' 
                   : 'text-neutral-600 hover:bg-neutral-100'
               }`}
             >
-              <Wallet className="w-4 h-4 inline mr-2" />
-              My Wallets
+              <Wallet className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">My Wallets</span>
+              <span className="sm:hidden">Wallets</span>
             </button>
             <button
               onClick={() => setProfileTab('sharing')}
-              className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all ${
+              className={`flex-1 py-2.5 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm transition-all ${
                 profileTab === 'sharing' 
                   ? 'bg-emerald-500 text-white' 
                   : 'text-neutral-600 hover:bg-neutral-100'
               }`}
             >
-              <Share2 className="w-4 h-4 inline mr-2" />
-              Sharing
+              <Share2 className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Sharing</span>
+              <span className="sm:hidden">Share</span>
             </button>
           </div>
         </div>
 
-        {/* Tab Content */}
-        <div className="max-w-2xl mx-auto px-4 py-6 pb-20">
+        {/* Tab Content - Mobile Optimized */}
+        <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20">
           {profileTab === 'profile' && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-              <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
-                <h3 className="font-bold text-lg text-neutral-900">Account Information</h3>
-                <div className="space-y-3">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 sm:space-y-4">
+              {/* User Info Card */}
+              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 space-y-3 sm:space-y-4">
+                <h3 className="font-bold text-base sm:text-lg text-neutral-900">Account Information</h3>
+                <div className="space-y-2 sm:space-y-3">
                   <div className="flex justify-between items-center py-2 border-b border-neutral-100">
-                    <span className="text-neutral-500">Name</span>
-                    <span className="font-medium text-neutral-900">{user.displayName || 'Not set'}</span>
+                    <span className="text-neutral-500 text-sm sm:text-base">Display Name</span>
+                    <span className="font-medium text-neutral-900 text-sm sm:text-base text-right">{user.displayName || 'Not set'}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-neutral-100">
-                    <span className="text-neutral-500">Email</span>
-                    <span className="font-medium text-neutral-900">{user.email}</span>
+                    <span className="text-neutral-500 text-sm sm:text-base">Email</span>
+                    <span className="font-medium text-neutral-900 text-sm sm:text-base text-right break-all">{user.email}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-neutral-100">
-                    <span className="text-neutral-500">User ID</span>
-                    <span className="font-mono text-xs text-neutral-600">{user.uid.substring(0, 8)}...</span>
+                    <span className="text-neutral-500 text-sm sm:text-base">User ID</span>
+                    <span className="font-mono text-xs sm:text-sm text-neutral-600">{user.uid.substring(0, 12)}...</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-neutral-500 text-sm sm:text-base">Email Verified</span>
+                    <span className={`font-medium text-sm sm:text-base ${user.emailVerified ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {user.emailVerified ? 'Yes' : 'No'}
+                    </span>
                   </div>
                 </div>
               </div>
               
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h3 className="font-bold text-lg text-neutral-900 mb-4">App Information</h3>
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-500">Version</span>
-                  <span className="font-medium text-neutral-900">v{APP_VERSION}</span>
+              {/* Stats Card */}
+              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6">
+                <h3 className="font-bold text-base sm:text-lg text-neutral-900 mb-3 sm:mb-4">Wallet Stats</h3>
+                <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                  <div className="text-center p-2 sm:p-3 bg-emerald-50 rounded-lg sm:rounded-xl">
+                    <div className="text-xl sm:text-2xl font-bold text-emerald-600">{ownedWallets.length}</div>
+                    <div className="text-xs sm:text-sm text-neutral-600">Owned</div>
+                  </div>
+                  <div className="text-center p-2 sm:p-3 bg-blue-50 rounded-lg sm:rounded-xl">
+                    <div className="text-xl sm:text-2xl font-bold text-blue-600">{sharedWithMe.length}</div>
+                    <div className="text-xs sm:text-sm text-neutral-600">Shared</div>
+                  </div>
+                  <div className="text-center p-2 sm:p-3 bg-amber-50 rounded-lg sm:rounded-xl">
+                    <div className="text-xl sm:text-2xl font-bold text-amber-600">{pendingInvites.length}</div>
+                    <div className="text-xs sm:text-sm text-neutral-600">Pending</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* App Info Card */}
+              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6">
+                <h3 className="font-bold text-base sm:text-lg text-neutral-900 mb-3 sm:mb-4">App Information</h3>
+                <div className="space-y-2 sm:space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-500 text-sm sm:text-base">Version</span>
+                    <span className="font-medium text-neutral-900 text-sm sm:text-base">v{APP_VERSION}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-500 text-sm sm:text-base">Last Login</span>
+                    <span className="font-medium text-neutral-900 text-sm sm:text-base">
+                      {user.metadata?.lastSignInTime ? new Date(user.metadata.lastSignInTime).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </motion.div>
           )}
 
           {profileTab === 'wallets' && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 sm:space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-lg text-neutral-900">Your Wallets</h3>
+                <h3 className="font-bold text-base sm:text-lg text-neutral-900">Your Wallets</h3>
                 <button
                   onClick={() => setShowCreateWalletModal(true)}
-                  className="px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold text-sm hover:bg-emerald-600 transition-colors flex items-center gap-2"
+                  className="px-3 sm:px-4 py-2 bg-emerald-500 text-white rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm hover:bg-emerald-600 transition-colors flex items-center gap-1.5 sm:gap-2"
                 >
-                  <Plus className="w-4 h-4" />
-                  New Wallet
+                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">New Wallet</span>
+                  <span className="sm:hidden">New</span>
                 </button>
               </div>
               
@@ -1309,49 +1355,151 @@ export default function App() {
           )}
 
           {profileTab === 'sharing' && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-              <h3 className="font-bold text-lg text-neutral-900">Wallet Sharing</h3>
-              <p className="text-neutral-500">Manage sharing settings for your wallets in the My Wallets tab.</p>
-              
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h4 className="font-bold text-neutral-900 mb-2">How Sharing Works</h4>
-                <ul className="space-y-2 text-sm text-neutral-600">
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
-                    Go to My Wallets and click the share icon
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
-                    Enter the email of the person you want to share with
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
-                    Choose their role: Viewer (read-only) or Editor (can add/edit)
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">4</span>
-                    They'll receive a notification to accept the invitation
-                  </li>
-                </ul>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h4 className="font-bold text-neutral-900 mb-2">Role Permissions</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded">Owner</span>
-                    <span className="text-sm text-neutral-600">Full control, can share and manage roles</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded">Editor</span>
-                    <span className="text-sm text-neutral-600">Can add, edit, and delete transactions</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-1 bg-neutral-100 text-neutral-700 text-xs font-bold rounded">Viewer</span>
-                    <span className="text-sm text-neutral-600">Can only view transactions and data</span>
-                  </div>
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 sm:space-y-4">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-3 sm:p-4">
+                  <div className="text-xl sm:text-2xl font-bold text-blue-600">{sharedWithMe.length}</div>
+                  <div className="text-xs sm:text-sm text-neutral-600">Shared with You</div>
+                </div>
+                <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-3 sm:p-4">
+                  <div className="text-xl sm:text-2xl font-bold text-emerald-600">{ownedWallets.filter(w => w.members?.some(m => m.status !== 'declined')).length}</div>
+                  <div className="text-xs sm:text-sm text-neutral-600">You Shared</div>
                 </div>
               </div>
+
+              {/* Wallets Shared With Me */}
+              {sharedWithMe.length > 0 && (
+                <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-3 sm:p-4">
+                  <h3 className="font-bold text-base sm:text-lg text-neutral-900 mb-3 sm:mb-4 flex items-center gap-2">
+                    <Users className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                    Shared With You
+                  </h3>
+                  <div className="space-y-2 sm:space-y-3">
+                    {sharedWithMe.map((wallet) => (
+                      <div key={wallet.id} className="flex items-center justify-between p-2 sm:p-3 bg-neutral-50 rounded-lg sm:rounded-xl">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                            <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-neutral-900 text-sm sm:text-base truncate">{wallet.name}</div>
+                            <div className="text-xs text-neutral-500 truncate">Your role: <span className="capitalize font-medium text-blue-600">{wallet.myRole}</span></div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedWalletId(wallet.id);
+                            setShowUserProfile(false);
+                          }}
+                          className="px-2 sm:px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold text-xs hover:bg-emerald-100 transition-colors flex-shrink-0"
+                        >
+                          View
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Pending Invitations */}
+              {pendingInvites.length > 0 && (
+                <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-3 sm:p-4">
+                  <h3 className="font-bold text-base sm:text-lg text-neutral-900 mb-3 sm:mb-4 flex items-center gap-2">
+                    <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
+                    Pending Invitations
+                  </h3>
+                  <div className="space-y-2 sm:space-y-3">
+                    {pendingInvites.map((wallet) => (
+                      <div key={wallet.id} className="flex items-center justify-between p-2 sm:p-3 bg-amber-50 rounded-lg sm:rounded-xl">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+                            <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-neutral-900 text-sm sm:text-base truncate">{wallet.name}</div>
+                            <div className="text-xs text-amber-600">Awaiting your response</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => {
+                              const member = wallet.members?.find(m => m.userEmail === user?.email?.toLowerCase());
+                              if (member) {
+                                declineInvitation(member.id, wallet.id);
+                              }
+                            }}
+                            className="px-2 sm:px-3 py-1.5 bg-white text-neutral-600 border border-neutral-200 rounded-lg font-bold text-xs hover:bg-neutral-50 transition-colors"
+                          >
+                            Decline
+                          </button>
+                          <button
+                            onClick={() => {
+                              const member = wallet.members?.find(m => m.userEmail === user?.email?.toLowerCase());
+                              if (member) {
+                                acceptInvitation(member.id, wallet.id, wallet.name, wallet.ownerId);
+                              }
+                            }}
+                            className="px-2 sm:px-3 py-1.5 bg-emerald-500 text-white rounded-lg font-bold text-xs hover:bg-emerald-600 transition-colors"
+                          >
+                            Accept
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Wallets I Shared */}
+              {ownedWallets.some(w => w.members?.some(m => m.status !== 'declined')) && (
+                <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-3 sm:p-4">
+                  <h3 className="font-bold text-base sm:text-lg text-neutral-900 mb-3 sm:mb-4 flex items-center gap-2">
+                    <Share2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
+                    Wallets You Shared
+                  </h3>
+                  <div className="space-y-3 sm:space-y-4">
+                    {ownedWallets.filter(w => w.members?.some(m => m.status !== 'declined')).map((wallet) => (
+                      <div key={wallet.id} className="border border-neutral-200 rounded-lg sm:rounded-xl p-3 sm:p-4">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                            <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </div>
+                          <div className="font-bold text-neutral-900 text-sm sm:text-base truncate">{wallet.name}</div>
+                        </div>
+                        <div className="space-y-1.5 sm:space-y-2 pl-10 sm:pl-12">
+                          {wallet.members?.filter(m => m.status !== 'declined').map((member) => (
+                            <div key={member.id} className="flex items-center justify-between text-xs sm:text-sm">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-neutral-200 flex items-center justify-center flex-shrink-0">
+                                  <UserIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-neutral-500" />
+                                </div>
+                                <span className="text-neutral-600 truncate">{member.userEmail}</span>
+                              </div>
+                              <span className={`px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${
+                                member.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                                member.role === 'editor' ? 'bg-blue-100 text-blue-700' :
+                                'bg-neutral-100 text-neutral-700'
+                              }`}>
+                                {member.status === 'pending' ? 'Pending' : member.role}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {sharedWithMe.length === 0 && pendingInvites.length === 0 && !ownedWallets.some(w => w.members?.some(m => m.status !== 'declined')) && (
+                <div className="text-center py-8 sm:py-12 text-neutral-500">
+                  <Users className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-neutral-300" />
+                  <p className="text-sm sm:text-base">No sharing activity yet.</p>
+                  <p className="text-xs sm:text-sm mt-1">Share a wallet to get started!</p>
+                </div>
+              )}
             </motion.div>
           )}
         </div>
