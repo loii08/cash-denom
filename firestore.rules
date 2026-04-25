@@ -191,7 +191,7 @@ service cloud.firestore {
         resource.data.invitedBy == request.auth.uid
       );
       allow create: if isAuthenticated() && 
-                    isWalletOwner(request.resource.data.walletId) &&
+                    request.resource.data.invitedBy == request.auth.uid &&
                     request.resource.data.keys().hasAll(['walletId', 'userEmail', 'role', 'status', 'invitedBy', 'invitedAt']);
       allow update: if isAuthenticated();
       allow delete: if isAuthenticated() && (
