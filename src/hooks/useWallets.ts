@@ -133,15 +133,27 @@ export function useWallets(user: User | null) {
         invitedAt: doc.data().invitedAt?.toDate(),
         respondedAt: doc.data().respondedAt?.toDate(),
       } as WalletMember));
-      await processMemberships(memberships);
       
-      setLoadingStates(prev => {
-        const newStates = { ...prev, members: false };
-        if (!newStates.owned && !newStates.members && !newStates.pending) {
-          setLoading(false);
-        }
-        return newStates;
-      });
+      if (memberships.length === 0) {
+        // No memberships, mark as done immediately
+        setLoadingStates(prev => {
+          const newStates = { ...prev, members: false };
+          if (!newStates.owned && !newStates.members && !newStates.pending) {
+            setLoading(false);
+          }
+          return newStates;
+        });
+      } else {
+        // Process memberships and then mark as done
+        await processMemberships(memberships);
+        setLoadingStates(prev => {
+          const newStates = { ...prev, members: false };
+          if (!newStates.owned && !newStates.members && !newStates.pending) {
+            setLoading(false);
+          }
+          return newStates;
+        });
+      }
     }, (err) => {
       console.error('Error fetching wallet memberships by userId:', err);
       setLoadingStates(prev => {
@@ -161,15 +173,27 @@ export function useWallets(user: User | null) {
         invitedAt: doc.data().invitedAt?.toDate(),
         respondedAt: doc.data().respondedAt?.toDate(),
       } as WalletMember));
-      await processMemberships(memberships);
       
-      setLoadingStates(prev => {
-        const newStates = { ...prev, pending: false };
-        if (!newStates.owned && !newStates.members && !newStates.pending) {
-          setLoading(false);
-        }
-        return newStates;
-      });
+      if (memberships.length === 0) {
+        // No pending invites, mark as done immediately
+        setLoadingStates(prev => {
+          const newStates = { ...prev, pending: false };
+          if (!newStates.owned && !newStates.members && !newStates.pending) {
+            setLoading(false);
+          }
+          return newStates;
+        });
+      } else {
+        // Process memberships and then mark as done
+        await processMemberships(memberships);
+        setLoadingStates(prev => {
+          const newStates = { ...prev, pending: false };
+          if (!newStates.owned && !newStates.members && !newStates.pending) {
+            setLoading(false);
+          }
+          return newStates;
+        });
+      }
     }, (err) => {
       console.error('Error fetching pending invites by email:', err);
       setLoadingStates(prev => {
