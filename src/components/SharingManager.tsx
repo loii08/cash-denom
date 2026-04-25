@@ -106,9 +106,13 @@ export function SharingManager({
       setEmail('');
       setSelectedRole('viewer');
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to share access. Please try again.'
-      );
+      const errorMessage = err instanceof Error ? err.message : 'Failed to share access. Please try again.';
+      // If user already has access, show as warning not error
+      if (errorMessage.includes('already has access')) {
+        setError('This email is already shared with this wallet. Check the member list below.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsSharing(false);
     }
