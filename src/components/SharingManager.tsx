@@ -182,40 +182,40 @@ export function SharingManager({
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
             >
-              <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+              <div className="bg-white w-full max-w-lg rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
                 {/* Header */}
-                <div className="p-6 border-b border-neutral-200 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-white">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                      <Share2 className="w-5 h-5 text-emerald-600" />
+                <div className="p-4 sm:p-6 border-b border-neutral-200 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-white">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-100 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Share2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
                     </div>
-                    <div>
-                      <h2 className="font-bold text-xl text-neutral-900">Share "{walletName}"</h2>
-                      <p className="text-sm text-neutral-500">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="font-bold text-base sm:text-xl text-neutral-900 truncate">Share "{walletName}"</h2>
+                      <p className="text-xs sm:text-sm text-neutral-500 hidden sm:block">
                         Manage who can view or edit this wallet
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={onClose}
-                    className="p-2 hover:bg-neutral-100 rounded-xl transition-colors"
+                    className="p-2 hover:bg-neutral-100 rounded-xl transition-colors flex-shrink-0"
                   >
                     <X className="w-5 h-5 text-neutral-500" />
                   </button>
                 </div>
 
                 {/* Content */}
-                <div className="p-6 space-y-6 overflow-y-auto">
+                <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto">
                   {/* Add New User */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-wider">
+                  <div className="space-y-2 sm:space-y-3">
+                    <h3 className="text-xs sm:text-sm font-bold text-neutral-500 uppercase tracking-wider">
                       Add New User
                     </h3>
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                        <label className="block text-xs sm:text-sm font-medium text-neutral-700 mb-1 sm:mb-1.5">
                           Email Address
                         </label>
                         <input
@@ -230,15 +230,15 @@ export function SharingManager({
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleShare();
                           }}
-                          className="w-full px-4 py-3 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                          className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                        <label className="block text-xs sm:text-sm font-medium text-neutral-700 mb-1 sm:mb-1.5">
                           Role
                         </label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           {(['editor', 'viewer'] as UserRole[]).map((role) => {
                             const config = roleConfig[role];
                             const Icon = config.icon;
@@ -246,17 +246,17 @@ export function SharingManager({
                               <button
                                 key={role}
                                 onClick={() => setSelectedRole(role)}
-                                className={`p-3 rounded-xl border-2 transition-all text-left ${
+                                className={`p-2.5 sm:p-3 rounded-lg sm:rounded-xl border-2 transition-all text-left ${
                                   selectedRole === role
                                     ? config.color
                                     : 'border-neutral-200 hover:border-neutral-300'
                                 }`}
                               >
-                                <Icon className="w-4 h-4 mb-1" />
-                                <p className="font-semibold text-sm">{config.label}</p>
+                                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 mb-1" />
+                                <p className="font-semibold text-xs sm:text-sm">{config.label}</p>
                               </button>
                             );
-                          })}
+                          })}</div>
                         </div>
                         <p className="text-xs text-neutral-500 mt-2">
                           {roleConfig[selectedRole].description}
@@ -267,9 +267,9 @@ export function SharingManager({
                         <motion.div
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-xl"
+                          className="flex items-center gap-2 text-red-600 text-xs sm:text-sm bg-red-50 p-2.5 sm:p-3 rounded-xl"
                         >
-                          <AlertCircle className="w-4 h-4" />
+                          <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           {error}
                         </motion.div>
                       )}
@@ -278,9 +278,9 @@ export function SharingManager({
                         <motion.div
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="flex items-center gap-2 text-amber-600 text-sm bg-amber-50 p-3 rounded-xl"
+                          className="flex items-center gap-2 text-amber-600 text-xs sm:text-sm bg-amber-50 p-2.5 sm:p-3 rounded-xl"
                         >
-                          <AlertCircle className="w-4 h-4" />
+                          <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           {warning}
                         </motion.div>
                       )}
@@ -288,7 +288,7 @@ export function SharingManager({
                       <button
                         onClick={handleShare}
                         disabled={!email.trim() || isSharing}
-                        className="w-full py-3 font-bold bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-300 disabled:cursor-not-allowed text-white rounded-xl transition-all flex items-center justify-center gap-2"
+                        className="w-full py-2.5 sm:py-3 font-bold bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-300 disabled:cursor-not-allowed text-white rounded-xl transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
                       >
                         {isSharing ? (
                           <motion.div
@@ -307,15 +307,15 @@ export function SharingManager({
                   </div>
 
                   {/* Shared Users List */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-wider">
+                  <div className="space-y-2 sm:space-y-3">
+                    <h3 className="text-xs sm:text-sm font-bold text-neutral-500 uppercase tracking-wider">
                       Shared With ({sharedMembers.length})
                     </h3>
 
                     {sharedMembers.length === 0 ? (
-                      <div className="text-center py-8 bg-neutral-50 rounded-2xl">
-                        <Users className="w-8 h-8 text-neutral-300 mx-auto mb-2" />
-                        <p className="text-neutral-500 text-sm">
+                      <div className="text-center py-6 sm:py-8 bg-neutral-50 rounded-2xl">
+                        <Users className="w-7 h-7 sm:w-8 sm:h-8 text-neutral-300 mx-auto mb-2" />
+                        <p className="text-neutral-500 text-xs sm:text-sm">
                           No one has access yet. Share your tracker to collaborate.
                         </p>
                       </div>
@@ -330,38 +330,38 @@ export function SharingManager({
                           return (
                             <div
                               key={member.id}
-                              className="flex items-center justify-between p-3 bg-neutral-50 rounded-xl"
+                              className="flex items-center justify-between p-2.5 sm:p-3 bg-neutral-50 rounded-xl"
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                                 {member.userPhotoURL ? (
                                   <img
                                     src={member.userPhotoURL}
                                     alt={member.userName || ''}
-                                    className="w-10 h-10 rounded-full"
+                                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex-shrink-0"
                                   />
                                 ) : (
-                                  <div className="w-10 h-10 bg-neutral-200 rounded-full flex items-center justify-center">
-                                    <Users className="w-5 h-5 text-neutral-400" />
+                                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-neutral-200 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <Users className="w-4 h-4 sm:w-5 sm:h-5 text-neutral-400" />
                                   </div>
                                 )}
-                                <div>
-                                  <p className="font-medium text-neutral-900 text-sm">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium text-neutral-900 text-xs sm:text-sm truncate">
                                     {member.userName || member.userEmail}
                                   </p>
-                                  <p className="text-xs text-neutral-500">
+                                  <p className="text-xs text-neutral-500 truncate">
                                     {member.userEmail}
                                   </p>
                                   {member.status === 'pending' && (
                                     <span className={`text-xs ${statusConfig_item.color} font-medium`}>
-                                      {statusConfig_item.label} - Waiting for response
+                                      {statusConfig_item.label} - Waiting
                                     </span>
                                   )}
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                                 {/* Status Badge */}
-                                <span className={`px-2 py-1 rounded-lg text-xs font-medium ${statusConfig_item.bg} ${statusConfig_item.color}`}>
+                                <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg text-xs font-medium ${statusConfig_item.bg} ${statusConfig_item.color}`}>
                                   {statusConfig_item.label}
                                 </span>
 
@@ -375,10 +375,10 @@ export function SharingManager({
                                         )
                                       }
                                       disabled={isUpdating}
-                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${config.color}`}
+                                      className={`flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-medium border transition-all ${config.color}`}
                                     >
                                       <Icon className="w-3 h-3" />
-                                      {config.label}
+                                      <span className="hidden sm:inline">{config.label}</span>
                                       <ChevronDown className="w-3 h-3" />
                                     </button>
 
