@@ -136,27 +136,39 @@ export function useWallets(user: User | null) {
       console.error('Error fetching pending invites by email:', err);
     });
 
-    // Fetch members for each wallet - only for wallets the user owns or is member of
-    const unsubWalletMembers = onSnapshot(
+    // Fetch members where user is the inviter (so owner can see who they invited)
+    const unsubInvitedMembers = onSnapshot(
       query(
         collection(db, 'walletMembers'),
-        where('userId', '==', user.uid)
+        where('invitedBy', '==', user.uid)
       ),
       (snapshot) => {
-        const allMembers: WalletMember[] = snapshot.docs.map(doc => ({
+        const invitedMembers: WalletMember[] = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
           invitedAt: doc.data().invitedAt?.toDate(),
           respondedAt: doc.data().respondedAt?.toDate(),
         } as WalletMember));
 
-        setWallets(prev => prev.map(w => ({
-          ...w,
-          members: allMembers.filter(m => m.walletId === w.id),
-        })));
+        setWallets(prev => prev.map(w => {
+          // Combine existing members with newly invited members for this wallet
+          const existingMembers = prev.find(pw => pw.id === w.id)?.members || [];
+          const newMembersForWallet = invitedMembers.filter(m => m.walletId === w.id);
+          
+          // Merge and deduplicate by member ID
+          const memberMap = new Map<string, WalletMember>();
+          [...existingMembers, ...newMembersForWallet].forEach(m => {
+            memberMap.set(m.id, m);
+          });
+          
+          return {
+            ...w,
+            members: Array.from(memberMap.values()),
+          };
+        }));
       },
       (err) => {
-        console.error('Error fetching wallet members:', err);
+        console.error('Error fetching invited members:', err);
       }
     );
 
@@ -164,7 +176,7 @@ export function useWallets(user: User | null) {
       unsubOwned();
       unsubMembers();
       unsubPendingInvites();
-      unsubWalletMembers();
+      unsubInvitedMembers();
     };
   }, [user]);
 
