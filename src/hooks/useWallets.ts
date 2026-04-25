@@ -33,11 +33,11 @@ export function useWallets(user: User | null) {
       where('ownerId', '==', user.uid)
     );
 
-    // Query 2a: Wallet memberships where user is a member (accepted invites)
+    // Query 2a: Wallet memberships where user is a member (accepted invites only)
     const memberQuery = query(
       collection(db, 'walletMembers'),
       where('userId', '==', user.uid),
-      where('status', 'in', ['pending', 'accepted'])
+      where('status', '==', 'accepted')
     );
 
     // Query 2b: Pending invites by email (user hasn't accepted yet)
