@@ -14,6 +14,7 @@ export function useWallets(user: User | null) {
   const [wallets, setWallets] = useState<WalletWithMembers[]>([]);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingStates, setLoadingStates] = useState({ owned: true, members: true, pending: true });
   const [error, setError] = useState<string | null>(null);
 
   // Get wallets where user is owner or member
@@ -26,6 +27,7 @@ export function useWallets(user: User | null) {
     }
 
     setLoading(true);
+    setLoadingStates({ owned: true, members: true, pending: true });
 
     // Query 1: Wallets where user is owner
     const ownedQuery = query(
@@ -66,11 +68,24 @@ export function useWallets(user: User | null) {
         }));
         return [...otherWallets, ...updatedOwned];
       });
-      setLoading(false);
+      
+      setLoadingStates(prev => {
+        const newStates = { ...prev, owned: false };
+        if (!newStates.owned && !newStates.members && !newStates.pending) {
+          setLoading(false);
+        }
+        return newStates;
+      });
     }, (err) => {
       console.error('Error fetching owned wallets:', err);
       setError('Failed to load wallets');
-      setLoading(false);
+      setLoadingStates(prev => {
+        const newStates = { ...prev, owned: false };
+        if (!newStates.owned && !newStates.members && !newStates.pending) {
+          setLoading(false);
+        }
+        return newStates;
+      });
     });
 
     // Helper function to process memberships and fetch wallet details
@@ -119,8 +134,23 @@ export function useWallets(user: User | null) {
         respondedAt: doc.data().respondedAt?.toDate(),
       } as WalletMember));
       await processMemberships(memberships);
+      
+      setLoadingStates(prev => {
+        const newStates = { ...prev, members: false };
+        if (!newStates.owned && !newStates.members && !newStates.pending) {
+          setLoading(false);
+        }
+        return newStates;
+      });
     }, (err) => {
       console.error('Error fetching wallet memberships by userId:', err);
+      setLoadingStates(prev => {
+        const newStates = { ...prev, members: false };
+        if (!newStates.owned && !newStates.members && !newStates.pending) {
+          setLoading(false);
+        }
+        return newStates;
+      });
     });
 
     // Subscribe to pending invites by email
@@ -132,8 +162,23 @@ export function useWallets(user: User | null) {
         respondedAt: doc.data().respondedAt?.toDate(),
       } as WalletMember));
       await processMemberships(memberships);
+      
+      setLoadingStates(prev => {
+        const newStates = { ...prev, pending: false };
+        if (!newStates.owned && !newStates.members && !newStates.pending) {
+          setLoading(false);
+        }
+        return newStates;
+      });
     }, (err) => {
       console.error('Error fetching pending invites by email:', err);
+      setLoadingStates(prev => {
+        const newStates = { ...prev, pending: false };
+        if (!newStates.owned && !newStates.members && !newStates.pending) {
+          setLoading(false);
+        }
+        return newStates;
+      });
     });
 
     // Fetch members where user is the inviter (so owner can see who they invited)
