@@ -70,6 +70,7 @@ export function SharingManager({
   const [selectedRole, setSelectedRole] = useState<UserRole>('viewer');
   const [isSharing, setIsSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [showRoleMenu, setShowRoleMenu] = useState<string | null>(null);
 
@@ -94,12 +95,13 @@ export function SharingManager({
       m.status !== 'declined'
     );
     if (alreadyShared) {
-      setError('This user already has access or has a pending invitation');
+      setWarning('This user already has access or has a pending invitation');
       return;
     }
 
     setIsSharing(true);
     setError(null);
+    setWarning(null);
 
     try {
       await onShareWallet(email.trim(), selectedRole);
@@ -109,7 +111,7 @@ export function SharingManager({
       const errorMessage = err instanceof Error ? err.message : 'Failed to share access. Please try again.';
       // If user already has access, show as warning not error
       if (errorMessage.includes('already has access')) {
-        setError('This email is already shared with this wallet. Check the member list below.');
+        setWarning('This email is already shared with this wallet. Check the member list below.');
       } else {
         setError(errorMessage);
       }
@@ -207,7 +209,11 @@ export function SharingManager({
                           type="email"
                           placeholder="Enter email address..."
                           value={email}
-                          onChange={(e) => setEmail(e.target.value)}
+                          onChange={(e) => {
+                            setEmail(e.target.value);
+                            setWarning(null);
+                            setError(null);
+                          }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleShare();
                           }}
@@ -252,6 +258,17 @@ export function SharingManager({
                         >
                           <AlertCircle className="w-4 h-4" />
                           {error}
+                        </motion.div>
+                      )}
+
+                      {warning && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex items-center gap-2 text-amber-600 text-sm bg-amber-50 p-3 rounded-xl"
+                        >
+                          <AlertCircle className="w-4 h-4" />
+                          {warning}
                         </motion.div>
                       )}
 
