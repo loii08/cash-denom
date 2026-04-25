@@ -12,6 +12,7 @@ import {
   ChevronDown,
   AlertCircle,
   UserPlus,
+  AlertTriangle,
 } from 'lucide-react';
 import type { WalletMember, UserRole, ShareStatus } from '../types';
 
@@ -73,6 +74,7 @@ export function SharingManager({
   const [warning, setWarning] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [showRoleMenu, setShowRoleMenu] = useState<string | null>(null);
+  const [pendingRoleChange, setPendingRoleChange] = useState<{ memberId: string; newRole: UserRole; memberName: string } | null>(null);
 
   const handleShare = async () => {
     if (!email.trim()) return;
@@ -132,19 +134,30 @@ export function SharingManager({
     }
   };
 
-  const handleRoleChange = async (accessId: string, newRole: UserRole) => {
-    setUpdatingId(accessId);
+  const handleRoleChangeClick = (memberId: string, newRole: UserRole, memberName: string) => {
     setShowRoleMenu(null);
+    setPendingRoleChange({ memberId, newRole, memberName });
+  };
 
+  const confirmRoleChange = async () => {
+    if (!pendingRoleChange) return;
+    
+    setUpdatingId(pendingRoleChange.memberId);
+    
     try {
-      await onUpdateRole(accessId, newRole);
+      await onUpdateRole(pendingRoleChange.memberId, pendingRoleChange.newRole);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to update role. Please try again.'
       );
     } finally {
       setUpdatingId(null);
+      setPendingRoleChange(null);
     }
+  };
+
+  const cancelRoleChange = () => {
+    setPendingRoleChange(null);
   };
 
   // Filter out the owner (members with userId matching owner should not appear)
@@ -386,7 +399,7 @@ export function SharingManager({
                                                 <button
                                                   key={role}
                                                   onClick={() =>
-                                                    handleRoleChange(member.id!, role)
+                                                    handleRoleChangeClick(member.id!, role, member.userName || member.userEmail)
                                                   }
                                                   className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-neutral-50 transition-colors ${
                                                     member.role === role
@@ -449,6 +462,67 @@ export function SharingManager({
                       );
                     })}
                   </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Role Change Confirmation Dialog */}
+      <AnimatePresence>
+        {pendingRoleChange && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={cancelRoleChange}
+              className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+            >
+              <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <h3 className="font-bold text-lg text-neutral-900">Change Permission?</h3>
+                </div>
+                
+                <p className="text-neutral-600">
+                  Are you sure you want to change <span className="font-semibold text-neutral-900">{pendingRoleChange.memberName}</span>'s role to <span className="font-semibold text-neutral-900">{pendingRoleChange.newRole}</span>?
+                </p>
+                
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={cancelRoleChange}
+                    className="flex-1 py-2.5 px-4 font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmRoleChange}
+                    disabled={updatingId === pendingRoleChange.memberId}
+                    className="flex-1 py-2.5 px-4 font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    {updatingId === pendingRoleChange.memberId ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                          className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                        />
+                        Updating...
+                      </>
+                    ) : (
+                      'Confirm Change'
+                    )}
+                  </button>
                 </div>
               </div>
             </motion.div>
