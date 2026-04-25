@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface NotificationCenterProps {
   user: User;
-  onAcceptInvite: (memberId: string, walletId: string) => Promise<void>;
+  onAcceptInvite: (memberId: string, walletId: string, walletName?: string, ownerId?: string) => Promise<void>;
   onDeclineInvite: (memberId: string, walletId: string) => Promise<void>;
 }
 
@@ -115,7 +115,7 @@ export function NotificationCenter({ user, onAcceptInvite, onDeclineInvite }: No
       const memberSnap = await getDocs(memberQuery);
       if (!memberSnap.empty) {
         const memberId = memberSnap.docs[0].id;
-        await onAcceptInvite(memberId, notification.walletId);
+        await onAcceptInvite(memberId, notification.walletId, notification.walletName, notification.fromUserId);
       }
       await markAsRead(notification.id);
     } catch (err) {

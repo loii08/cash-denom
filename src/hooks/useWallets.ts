@@ -359,16 +359,16 @@ export function useWallets(user: User | null) {
   }, [user, wallets]);
 
   // Accept wallet invitation
-  const acceptInvitation = useCallback(async (memberId: string, walletId: string) => {
+  const acceptInvitation = useCallback(async (memberId: string, walletId: string, walletName?: string, ownerId?: string) => {
     if (!user) return;
 
     try {
-      // Get wallet details from Firestore
-      const walletDoc = await getDocs(query(collection(db, 'wallets'), where('__name__', '==', walletId)));
-      if (walletDoc.empty) throw new Error('Wallet not found');
-      const walletData = walletDoc.docs[0].data();
-      const ownerId = walletData.ownerId;
-      const walletName = walletData.name || 'Unnamed Wallet';
+      // Get member details to find owner (invitedBy)
+      const memberDoc = await getDocs(query(collection(db, 'walletMembers'), where('__name__', '==', memberId)));
+      if (memberDoc.empty) throw new Error('Invitation not found');
+      const memberData = memberDoc.docs[0].data();
+      const invitedBy = memberData.invitedBy;
+      const walletNameFromMember = walletName || memberData.walletName || 'Unnamed Wallet';
 
       // Update member record
       await updateDoc(doc(db, 'walletMembers', memberId), {
@@ -385,11 +385,11 @@ export function useWallets(user: User | null) {
         fromUserId: user.uid,
         fromUserName: user.displayName,
         fromUserEmail: user.email,
-        toUserId: ownerId,
+        toUserId: ownerId || invitedBy,
         toUserEmail: null,
         walletId,
-        walletName,
-        message: `${user.displayName || user.email} accepted your invitation to "${walletName}"`,
+        walletName: walletNameFromMember,
+        message: `${user.displayName || user.email} accepted your invitation to "${walletNameFromMember}"`,
         read: false,
         createdAt: Timestamp.now(),
       };

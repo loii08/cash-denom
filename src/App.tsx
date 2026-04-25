@@ -1241,7 +1241,7 @@ export default function App() {
                                 // Find memberId for this wallet
                                 const member = wallet.members?.find(m => m.userEmail === user?.email?.toLowerCase());
                                 if (member) {
-                                  acceptInvitation(member.id, wallet.id);
+                                  acceptInvitation(member.id, wallet.id, wallet.name, wallet.ownerId);
                                 }
                               }}
                               className="px-3 py-2 bg-emerald-500 text-white rounded-lg font-bold text-sm hover:bg-emerald-600 transition-colors"
