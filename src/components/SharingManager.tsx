@@ -463,7 +463,6 @@ export function SharingManager({
                     })}
                   </div>
                 </div>
-              </div>
             </motion.div>
           </>
         )}
