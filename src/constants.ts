@@ -1,8 +1,9 @@
 // App version - update this with each release
-export const APP_VERSION = '1.2.18';
+export const APP_VERSION = '1.2.19';
 
 // Release notes
 export const VERSION_NOTES: Record<string, string> = {
+  '1.2.19': 'Auto-incremented version',
   '1.2.18': 'Auto-incremented version',
   '1.2.17': 'Auto-incremented version',
   '1.2.16': 'Auto-incremented version',
